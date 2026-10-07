@@ -1,0 +1,42 @@
+{
+  "diagnostic": true,
+  "prediction_eligible": false,
+  "collector_revision": "FREEWEB-1.2.2-CONTROLLED",
+  "schema_version": "V10-DATA-1.2",
+  "asof_date": "20261007",
+  "timestamp_kst": "2026-10-07T23:24:51.098185+09:00",
+  "checks": {
+    "naver_benchmark": {
+      "ok": true,
+      "sample_count": 5
+    },
+    "naver_investor_flow": {
+      "ok": true,
+      "sample_count": 0
+    },
+    "naver_etn": {
+      "ok": true,
+      "sample_count": 100
+    },
+    "naver_management": {
+      "ok": true,
+      "sample_count": 100
+    },
+    "naver_halt": {
+      "ok": true,
+      "sample_count": 100
+    },
+    "naver_etf": {
+      "ok": true,
+      "sample_count": 5
+    },
+    "daum_universe": {
+      "ok": true,
+      "sample_count": 5
+    }
+  },
+  "warnings": [
+    "Investor-flow endpoint responded but produced zero stock-coded rows in diagnostic parsing. Do not treat this source as proven stock-level flow; scheduled feature coverage must decide activation."
+  ],
+  "all_source_probes_ok": true
+}
