@@ -51,7 +51,7 @@ OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2.1-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.2-CONTROLLED"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -503,7 +503,7 @@ def etf_snapshot(asof):
 # ---------------------------------------------------------------------------
 
 def index_history(code, asof, page_size=100):
-    url = f"https://stock.naver.com/api/index/{code}/price?pageSize={page_size}&page=1"
+    url = f"https://stock.naver.com/api/securityFe/api/index/{code}/price?page={1}&pageSize={page_size}"
     obj = http_json(url, NAVER_HEADERS)
     rows = []
     if not isinstance(obj, list):
@@ -669,6 +669,13 @@ def run_diagnostic(asof):
             result["checks"][name] = {"ok": True, "sample_count": len(val[0]) if isinstance(val, tuple) and hasattr(val[0], "__len__") else (len(val) if hasattr(val, "__len__") else None)}
         except Exception as e:
             result["checks"][name] = {"ok": False, "error": str(e)}
+    result["warnings"] = []
+    flow_check = result["checks"].get("naver_investor_flow", {})
+    if flow_check.get("ok") and flow_check.get("sample_count") == 0:
+        result["warnings"].append(
+            "Investor-flow endpoint responded but produced zero stock-coded rows in diagnostic parsing. "
+            "Do not treat this source as proven stock-level flow; scheduled feature coverage must decide activation."
+        )
     result["all_source_probes_ok"] = all(x.get("ok") for x in result["checks"].values())
     write_json(OUT / f"diagnostic_{asof}_{now_kst().strftime('%H%M%S')}.json", result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
