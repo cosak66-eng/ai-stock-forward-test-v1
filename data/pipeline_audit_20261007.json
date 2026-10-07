@@ -1,0 +1,37 @@
+{
+  "pass": true,
+  "status": "PASS — FREE WEB SNAPSHOT READY",
+  "asof_date": "20261007",
+  "data_cutoff_rule": "18:00 KST; regular-session daily data only",
+  "snapshot_rows": 3533,
+  "eligible_rows": 425,
+  "duplicate_ticker": 0,
+  "sector_coverage": 0.749505,
+  "history_120bar_coverage": 0.995188,
+  "actual_trading_value_20d_coverage": 0.999151,
+  "history_fetch_errors": 0,
+  "management_codes": 0,
+  "halt_codes": 0,
+  "etf_codes": 0,
+  "etn_codes": 0,
+  "etf_snapshot_rows": 859,
+  "etf_snapshot_error": null,
+  "sector_error": null,
+  "sources": {
+    "universe": "Daum Finance public market-cap web data",
+    "history_ohlcv_actual_value": "Daum Finance public daily quote web data",
+    "sector": "Daum Finance public sector web data",
+    "management_halt_etf_etn": "Naver Finance public pages",
+    "etf_full_snapshot": "Naver Finance public ETF item list"
+  },
+  "integrity": {
+    "krx_open_api_used": false,
+    "krx_auth_key_required": false,
+    "trading_value_estimated_close_x_volume": false,
+    "actual_acc_trade_price_used": true,
+    "missing_value_imputation": false,
+    "etf_in_stock_ranking": false
+  },
+  "note": "Website-facing interfaces can change; source failure must remain DATA PIPELINE failure, never silent imputation.",
+  "collected_at_kst": "2026-10-07T21:10:34.284327+09:00"
+}

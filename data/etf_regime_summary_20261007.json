@@ -1,0 +1,309 @@
+{
+  "asof_date": "20261007",
+  "etf_count": 859,
+  "category_summary": {
+    "국내 시장지수": {
+      "count": 86,
+      "up": 0,
+      "down": 86,
+      "breadth_up_ratio": 0.0,
+      "avg_change_rate_pct": -1.884302,
+      "avg_3m_return_pct": -11.130859
+    },
+    "해외 주식": {
+      "count": 274,
+      "up": 129,
+      "down": 132,
+      "breadth_up_ratio": 0.470803,
+      "avg_change_rate_pct": -0.15062,
+      "avg_3m_return_pct": -10.61369
+    },
+    "기타": {
+      "count": 73,
+      "up": 34,
+      "down": 31,
+      "breadth_up_ratio": 0.465753,
+      "avg_change_rate_pct": 0.029863,
+      "avg_3m_return_pct": -4.828274
+    },
+    "국내 업종/테마": {
+      "count": 236,
+      "up": 48,
+      "down": 186,
+      "breadth_up_ratio": 0.20339,
+      "avg_change_rate_pct": -1.651314,
+      "avg_3m_return_pct": -4.179417
+    },
+    "채권": {
+      "count": 136,
+      "up": 76,
+      "down": 49,
+      "breadth_up_ratio": 0.558824,
+      "avg_change_rate_pct": -0.039118,
+      "avg_3m_return_pct": -3.291449
+    },
+    "국내 파생": {
+      "count": 37,
+      "up": 19,
+      "down": 18,
+      "breadth_up_ratio": 0.513514,
+      "avg_change_rate_pct": -0.784595,
+      "avg_3m_return_pct": -10.701089
+    },
+    "원자재": {
+      "count": 17,
+      "up": 8,
+      "down": 8,
+      "breadth_up_ratio": 0.470588,
+      "avg_change_rate_pct": 0.355882,
+      "avg_3m_return_pct": -0.985741
+    }
+  },
+  "top_20_by_3m_return": [
+    {
+      "ticker": "130680",
+      "name": "TIGER 원유선물Enhanced(H)",
+      "category": "원자재",
+      "return_3m_pct": 36.8043
+    },
+    {
+      "ticker": "261220",
+      "name": "KODEX WTI원유선물(H)",
+      "category": "원자재",
+      "return_3m_pct": 35.472
+    },
+    {
+      "ticker": "471990",
+      "name": "KODEX AI반도체핵심장비",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 33.0448
+    },
+    {
+      "ticker": "261120",
+      "name": "TIGER 미국달러선물인버스2X",
+      "category": "기타",
+      "return_3m_pct": 29.4457
+    },
+    {
+      "ticker": "261260",
+      "name": "KODEX 미국달러선물인버스2X",
+      "category": "기타",
+      "return_3m_pct": 29.4252
+    },
+    {
+      "ticker": "230480",
+      "name": "KIWOOM 미국달러선물인버스2X",
+      "category": "기타",
+      "return_3m_pct": 29.2715
+    },
+    {
+      "ticker": "475310",
+      "name": "SOL 반도체후공정",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 27.1988
+    },
+    {
+      "ticker": "455850",
+      "name": "SOL AI반도체소부장",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 25.7804
+    },
+    {
+      "ticker": "217780",
+      "name": "TIGER 차이나CSI300인버스(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": 25.1046
+    },
+    {
+      "ticker": "261060",
+      "name": "TIGER 코스닥150IT",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 22.9806
+    },
+    {
+      "ticker": "360150",
+      "name": "KODEX 코스닥150롱코스피200숏선물",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 21.2389
+    },
+    {
+      "ticker": "475300",
+      "name": "SOL 반도체전공정",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 20.3625
+    },
+    {
+      "ticker": "219390",
+      "name": "RISE 미국S&P원유생산기업(합성 H)",
+      "category": "해외 주식",
+      "return_3m_pct": 19.2111
+    },
+    {
+      "ticker": "457990",
+      "name": "PLUS 태양광&ESS",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 18.847
+    },
+    {
+      "ticker": "465330",
+      "name": "RISE 2차전지TOP10",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 18.2592
+    },
+    {
+      "ticker": "290080",
+      "name": "RISE 200고배당커버드콜ATM",
+      "category": "국내 파생",
+      "return_3m_pct": 17.4605
+    },
+    {
+      "ticker": "466810",
+      "name": "BNK 2차전지양극재",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 17.1171
+    },
+    {
+      "ticker": "462330",
+      "name": "KODEX 2차전지산업레버리지",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 15.942
+    },
+    {
+      "ticker": "305540",
+      "name": "TIGER 2차전지테마",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 15.2302
+    },
+    {
+      "ticker": "117460",
+      "name": "KODEX 에너지화학",
+      "category": "국내 업종/테마",
+      "return_3m_pct": 15.1324
+    }
+  ],
+  "bottom_20_by_3m_return": [
+    {
+      "ticker": "456680",
+      "name": "TIGER 차이나전기차레버리지(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": -49.7621
+    },
+    {
+      "ticker": "243880",
+      "name": "TIGER 200IT레버리지",
+      "category": "국내 업종/테마",
+      "return_3m_pct": -40.6832
+    },
+    {
+      "ticker": "204480",
+      "name": "TIGER 차이나CSI300레버리지(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": -40.3509
+    },
+    {
+      "ticker": "236350",
+      "name": "TIGER 인도니프티50레버리지(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": -38.1676
+    },
+    {
+      "ticker": "396520",
+      "name": "TIGER 차이나반도체FACTSET",
+      "category": "해외 주식",
+      "return_3m_pct": -38.1075
+    },
+    {
+      "ticker": "219900",
+      "name": "ACE 중국본토CSI300레버리지(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": -37.2257
+    },
+    {
+      "ticker": "122630",
+      "name": "KODEX 레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.7011
+    },
+    {
+      "ticker": "267770",
+      "name": "TIGER 200선물레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.679
+    },
+    {
+      "ticker": "253150",
+      "name": "PLUS 200선물레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.4667
+    },
+    {
+      "ticker": "252400",
+      "name": "RISE 200선물레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.4515
+    },
+    {
+      "ticker": "253250",
+      "name": "KIWOOM 200선물레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.3214
+    },
+    {
+      "ticker": "123320",
+      "name": "TIGER 레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.2908
+    },
+    {
+      "ticker": "152500",
+      "name": "ACE 레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -36.2818
+    },
+    {
+      "ticker": "306950",
+      "name": "KODEX KRX300레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -35.762
+    },
+    {
+      "ticker": "304780",
+      "name": "HANARO 200선물레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -35.5166
+    },
+    {
+      "ticker": "453820",
+      "name": "KODEX 인도Nifty50레버리지(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": -34.4009
+    },
+    {
+      "ticker": "488080",
+      "name": "TIGER 반도체TOP10레버리지",
+      "category": "국내 파생",
+      "return_3m_pct": -33.9973
+    },
+    {
+      "ticker": "415920",
+      "name": "PLUS 글로벌희토류&전략자원생산기업",
+      "category": "원자재",
+      "return_3m_pct": -33.5982
+    },
+    {
+      "ticker": "416090",
+      "name": "ACE 중국과창판STAR50",
+      "category": "해외 주식",
+      "return_3m_pct": -32.8052
+    },
+    {
+      "ticker": "414780",
+      "name": "TIGER 차이나과창판STAR50(합성)",
+      "category": "해외 주식",
+      "return_3m_pct": -32.6481
+    }
+  ],
+  "usage": "MARKET_REGIME_AND_THEME_CONTEXT_ONLY",
+  "v1_0_stock_ranking_inclusion": false,
+  "source": "NAVER_FINANCE_PUBLIC_ETF_LIST"
+}
