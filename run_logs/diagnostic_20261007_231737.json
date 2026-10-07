@@ -1,0 +1,39 @@
+{
+  "diagnostic": true,
+  "prediction_eligible": false,
+  "collector_revision": "FREEWEB-1.2.1-CONTROLLED",
+  "schema_version": "V10-DATA-1.2",
+  "asof_date": "20261007",
+  "timestamp_kst": "2026-10-07T23:16:52.014475+09:00",
+  "checks": {
+    "naver_benchmark": {
+      "ok": false,
+      "error": "HTTP failed: https://stock.naver.com/api/index/KOSPI/price?pageSize=5&page=1 :: HTTP Error 404: Not Found"
+    },
+    "naver_investor_flow": {
+      "ok": true,
+      "sample_count": 0
+    },
+    "naver_etn": {
+      "ok": true,
+      "sample_count": 100
+    },
+    "naver_management": {
+      "ok": true,
+      "sample_count": 100
+    },
+    "naver_halt": {
+      "ok": true,
+      "sample_count": 100
+    },
+    "naver_etf": {
+      "ok": true,
+      "sample_count": 5
+    },
+    "daum_universe": {
+      "ok": true,
+      "sample_count": 5
+    }
+  },
+  "all_source_probes_ok": false
+}
