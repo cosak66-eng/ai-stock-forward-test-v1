@@ -1,0 +1,94 @@
+name: V1.0 Controlled Free Web Collector
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "Manual runs are diagnostic only and never prediction-eligible."
+        required: false
+        default: "diagnostic"
+
+  schedule:
+    # KST 15:31 and 15:36 = UTC 06:31 and 06:36, Monday-Friday.
+    # The collector itself enforces actual start/finish timestamps.
+    - cron: "31,36 6 * * 1-5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v1-controlled-daily-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      TZ: Asia/Seoul
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Deterministic self-test
+        run: |
+          python collector.py --self-test
+
+      - name: Run controlled collector
+        id: collector
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            python collector.py --mode scheduled
+          else
+            echo "Manual workflow_dispatch = DIAGNOSTIC ONLY"
+            python collector.py --mode diagnostic
+          fi
+
+      - name: Upload run output as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-controlled-${{ github.run_id }}
+          path: |
+            output/**
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Commit scheduled data or manual diagnostic log
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -d output ] || [ "$(find output -type f | head -n 1)" = "" ]; then
+            echo "No output to persist."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            mkdir -p data
+            cp -f output/* data/ || true
+            git add data
+          else
+            mkdir -p run_logs
+            cp -f output/* run_logs/ || true
+            git add run_logs
+          fi
+
+          if ! git diff --cached --quiet; then
+            git commit -m "data: controlled V1.0 collector $(date +'%Y-%m-%d %H:%M:%S')"
+            git push
+          else
+            echo "No changes to commit."
+          fi
