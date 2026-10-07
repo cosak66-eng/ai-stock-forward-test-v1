@@ -51,7 +51,7 @@ OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.1-CONTROLLED"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -252,7 +252,7 @@ def naver_krx_regular_snapshot():
             "startIdx": page,
             "pageSize": page_size,
         })
-        url = "https://m.stock.naver.com/api/domestic/market/stock/default?" + q
+        url = "https://stock.naver.com/api/domestic/market/stock/default?" + q
         obj = http_json(url, NAVER_HEADERS)
         recs = {}
         for d in record_dicts(obj):
@@ -291,7 +291,7 @@ def naver_investor_flow_map(asof):
             "startIdx": page,
             "pageSize": page_size,
         })
-        url = "https://m.stock.naver.com/api/domestic/market/trend/daily?" + q
+        url = "https://stock.naver.com/api/domestic/market/trend/daily?" + q
         obj = http_json(url, NAVER_HEADERS)
         recs = {}
         for d in record_dicts(obj):
@@ -425,7 +425,7 @@ def codes_from_market_ranking(order_type, max_pages=30):
             "orderType": order_type, "startIdx": page, "pageSize": 100,
         })
         obj = http_json(
-            "https://m.stock.naver.com/api/domestic/market/stock/default?" + q,
+            "https://stock.naver.com/api/domestic/market/stock/default?" + q,
             NAVER_HEADERS,
         )
         ok = True
@@ -445,7 +445,7 @@ def etn_codes(max_pages=30):
         q = urllib.parse.urlencode({
             "orderType": "AMOUNT_ETN", "startIdx": page, "pageSize": 100,
         })
-        obj = http_json("https://m.stock.naver.com/api/domestic/market/etn?" + q, NAVER_HEADERS)
+        obj = http_json("https://stock.naver.com/api/domestic/market/etn?" + q, NAVER_HEADERS)
         ok = True
         found = {code_from_dict(d) for d in record_dicts(obj)}
         found.discard(None)
@@ -466,7 +466,7 @@ def etf_snapshot(asof):
             "listingType": "tradingValueDesc", "size": 100, "index": page,
         })
         obj = http_json(
-            "https://m.stock.naver.com/api/stockSecurity/etfs/v2/domestic?" + q,
+            "https://stock.naver.com/api/stockSecurity/etfs/v2/domestic?" + q,
             NAVER_HEADERS,
         )
         found = 0
@@ -503,7 +503,7 @@ def etf_snapshot(asof):
 # ---------------------------------------------------------------------------
 
 def index_history(code, asof, page_size=100):
-    url = f"https://m.stock.naver.com/api/index/{code}/price?pageSize={page_size}&page=1"
+    url = f"https://stock.naver.com/api/index/{code}/price?pageSize={page_size}&page=1"
     obj = http_json(url, NAVER_HEADERS)
     rows = []
     if not isinstance(obj, list):
