@@ -1,0 +1,39 @@
+{
+  "diagnostic": true,
+  "prediction_eligible": false,
+  "collector_revision": "FREEWEB-1.2-CONTROLLED",
+  "schema_version": "V10-DATA-1.2",
+  "asof_date": "20261007",
+  "timestamp_kst": "2026-10-07T23:05:29.541682+09:00",
+  "checks": {
+    "naver_benchmark": {
+      "ok": true,
+      "sample_count": 5
+    },
+    "naver_investor_flow": {
+      "ok": false,
+      "error": "HTTP failed: https://m.stock.naver.com/api/domestic/market/trend/daily?tradeType=KRX&marketType=ALL&bizdate=20261007&startIdx=0&pageSize=100 :: HTTP Error 404: 404"
+    },
+    "naver_etn": {
+      "ok": false,
+      "error": "HTTP failed: https://m.stock.naver.com/api/domestic/market/etn?orderType=AMOUNT_ETN&startIdx=0&pageSize=100 :: HTTP Error 404: 404"
+    },
+    "naver_management": {
+      "ok": false,
+      "error": "HTTP failed: https://m.stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=statusTag&startIdx=0&pageSize=100 :: HTTP Error 404: 404"
+    },
+    "naver_halt": {
+      "ok": false,
+      "error": "HTTP failed: https://m.stock.naver.com/api/domestic/market/stock/default?tradeType=KRX&marketType=ALL&orderType=tradeStopYn&startIdx=0&pageSize=100 :: HTTP Error 404: 404"
+    },
+    "naver_etf": {
+      "ok": false,
+      "error": "HTTP failed: https://m.stock.naver.com/api/stockSecurity/etfs/v2/domestic?listingType=tradingValueDesc&size=100&index=0 :: HTTP Error 404: 404"
+    },
+    "daum_universe": {
+      "ok": true,
+      "sample_count": 5
+    }
+  },
+  "all_source_probes_ok": false
+}
