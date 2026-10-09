@@ -696,6 +696,15 @@ def run_scheduled(asof):
         })
         return 0
 
+        # Wait until the KRX regular-session capture window opens.
+    # Do not collect or freeze any market data before 15:30:30 KST.
+    while now_kst().time() < SAFE_CAPTURE_START:
+        remaining = (
+            datetime.combine(now_kst().date(), SAFE_CAPTURE_START, tzinfo=TZ)
+            - now_kst()
+        ).total_seconds()
+        time.sleep(min(10.0, max(0.1, remaining)))
+
     start = now_kst()
     if not (SAFE_CAPTURE_START <= start.time() <= SAFE_CAPTURE_END):
         return fail_audit(asof, "UNSAFE_CAPTURE_TIME", {
