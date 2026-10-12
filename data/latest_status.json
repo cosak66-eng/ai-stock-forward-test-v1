@@ -3,10 +3,10 @@
   "status": "FAIL — DATA PIPELINE",
   "collector_revision": "FREEWEB-1.2.2-CONTROLLED",
   "schema_version": "V10-DATA-1.2",
-  "asof_date": "20261009",
-  "error": "UNSAFE_CAPTURE_TIME",
-  "collected_at_kst": "2026-10-09T15:49:51.056787+09:00",
-  "capture_started_kst": "2026-10-09T15:49:51.056778+09:00",
-  "required_window_kst": "15:30:30–15:39:30",
+  "asof_date": "20261012",
+  "error": "SAFE_CAPTURE_SOURCE_FAILED",
+  "collected_at_kst": "2026-10-12T15:39:06.290944+09:00",
+  "capture_started_kst": "2026-10-12T15:38:23.432315+09:00",
+  "detail": "HTTP failed: https://stock.naver.com/api/securityFe/api/index/KOSPI/price?page=1&pageSize=100 :: HTTP Error 400: Bad Request",
   "after_market_contamination": "UNVERIFIED"
 }
