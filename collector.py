@@ -51,7 +51,7 @@ OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2.2-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.4-CONTROLLED"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -237,14 +237,14 @@ def parse_current_record(d):
     }
 
 
-def naver_krx_regular_snapshot():
+def naver_krx_regular_snapshot(max_pages=80):
     """
     Fetch KRX-only market list using tradeType=KRX.
     startIdx is treated as a zero-based PAGE INDEX, not a row offset.
     """
     out = {}
     page_size = 100
-    for page in range(0, 80):
+    for page in range(0, max_pages):
         q = urllib.parse.urlencode({
             "tradeType": "KRX",
             "marketType": "ALL",
@@ -502,23 +502,41 @@ def etf_snapshot(asof):
 # Benchmark: KOSPI / KOSDAQ index data (regular-session index)
 # ---------------------------------------------------------------------------
 
-def index_history(code, asof, page_size=100):
-    url = f"https://stock.naver.com/api/securityFe/api/index/{code}/price?page={1}&pageSize={page_size}"
-    obj = http_json(url, NAVER_HEADERS)
-    rows = []
-    if not isinstance(obj, list):
-        return rows
-    for x in obj:
-        ds = str(x.get("localTradedAt") or x.get("date") or "")[:10].replace("-", "")
-        if not re.fullmatch(r"\d{8}", ds) or ds > asof:
-            continue
-        rows.append({
-            "date": ds,
-            "close": nnum(scalar_first(x, "closePrice", "tradePrice", "close")),
-            "open": nnum(scalar_first(x, "openPrice", "openingPrice", "open")),
-            "high": nnum(scalar_first(x, "highPrice", "high")),
-            "low": nnum(scalar_first(x, "lowPrice", "low")),
-        })
+def index_history(code, asof, page_size=20, max_pages=4):
+    """
+    Domestic index daily history using conservative pagination.
+
+    Live validation showed pageSize=5 succeeds while pageSize=100 can return
+    HTTP 400. Use 20 rows per request and multiple pages so the 60D benchmark
+    still has enough history without relying on the fragile large request.
+    """
+    rows_by_date = {}
+    for page in range(1, max_pages + 1):
+        url = (
+            f"https://stock.naver.com/api/securityFe/api/index/{code}/price"
+            f"?page={page}&pageSize={page_size}"
+        )
+        obj = http_json(url, NAVER_HEADERS)
+        if not isinstance(obj, list) or not obj:
+            break
+
+        for x in obj:
+            ds = str(x.get("localTradedAt") or x.get("date") or "")[:10].replace("-", "")
+            if not re.fullmatch(r"\d{8}", ds) or ds > asof:
+                continue
+            rows_by_date[ds] = {
+                "date": ds,
+                "close": nnum(scalar_first(x, "closePrice", "tradePrice", "close")),
+                "open": nnum(scalar_first(x, "openPrice", "openingPrice", "open")),
+                "high": nnum(scalar_first(x, "highPrice", "high")),
+                "low": nnum(scalar_first(x, "lowPrice", "low")),
+            }
+
+        if len(obj) < page_size:
+            break
+        time.sleep(0.04)
+
+    rows = list(rows_by_date.values())
     rows.sort(key=lambda z: z["date"])
     return rows
 
@@ -655,7 +673,9 @@ def run_diagnostic(asof):
         "checks": {},
     }
     probes = [
-        ("naver_benchmark", lambda: index_history("KOSPI", asof, 5)),
+        ("naver_krx_market_list", lambda: naver_krx_regular_snapshot(1)),
+        ("naver_benchmark_kospi", lambda: index_history("KOSPI", asof, 20, 4)),
+        ("naver_benchmark_kosdaq", lambda: index_history("KOSDAQ", asof, 20, 4)),
         ("naver_investor_flow", lambda: naver_investor_flow_map(asof)),
         ("naver_etn", lambda: etn_codes(1)),
         ("naver_management", lambda: codes_from_market_ranking("statusTag", 1)),
@@ -670,12 +690,24 @@ def run_diagnostic(asof):
         except Exception as e:
             result["checks"][name] = {"ok": False, "error": str(e)}
     result["warnings"] = []
+
+    # 60D benchmark requires at least 61 dated observations.
+    for key in ("naver_benchmark_kospi", "naver_benchmark_kosdaq"):
+        chk = result["checks"].get(key, {})
+        if chk.get("ok") and (chk.get("sample_count") or 0) < 61:
+            chk["ok"] = False
+            chk["error"] = "BENCHMARK_HISTORY_LT_61"
+            result["warnings"].append(
+                f"{key} returned fewer than 61 dated rows; 60D benchmark is not usable."
+            )
+
     flow_check = result["checks"].get("naver_investor_flow", {})
     if flow_check.get("ok") and flow_check.get("sample_count") == 0:
         result["warnings"].append(
             "Investor-flow endpoint responded but produced zero stock-coded rows in diagnostic parsing. "
             "Do not treat this source as proven stock-level flow; scheduled feature coverage must decide activation."
         )
+
     result["all_source_probes_ok"] = all(x.get("ok") for x in result["checks"].values())
     write_json(OUT / f"diagnostic_{asof}_{now_kst().strftime('%H%M%S')}.json", result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
@@ -696,18 +728,30 @@ def run_scheduled(asof):
         })
         return 0
 
-        # Wait until the KRX regular-session capture window opens.
-    # Do not collect or freeze any market data before 15:30:30 KST.
-    while now_kst().time() < SAFE_CAPTURE_START:
-        remaining = (
-            datetime.combine(now_kst().date(), SAFE_CAPTURE_START, tzinfo=TZ)
-            - now_kst()
-        ).total_seconds()
-        time.sleep(min(10.0, max(0.1, remaining)))
+    runner_started = now_kst()
+
+    # GitHub scheduled workflows can start early or late. Early starts wait
+    # inside the runner until the approved capture window. Late starts fail.
+    if runner_started.time() < SAFE_CAPTURE_START:
+        target = datetime.combine(runner_started.date(), SAFE_CAPTURE_START, tzinfo=TZ)
+        wait_seconds = max(0.0, (target - runner_started).total_seconds())
+        if wait_seconds > 1800:
+            return fail_audit(asof, "EARLY_RUN_TOO_EARLY", {
+                "runner_started_kst": runner_started.isoformat(),
+                "planned_wait_seconds": round(wait_seconds, 3),
+                "required_window_kst": "15:30:30–15:39:30",
+            })
+        print(
+            f"Runner started early at {runner_started.isoformat()}; "
+            f"waiting {wait_seconds:.1f}s for safe KRX capture window.",
+            flush=True,
+        )
+        time.sleep(wait_seconds)
 
     start = now_kst()
     if not (SAFE_CAPTURE_START <= start.time() <= SAFE_CAPTURE_END):
         return fail_audit(asof, "UNSAFE_CAPTURE_TIME", {
+            "runner_started_kst": runner_started.isoformat(),
             "capture_started_kst": start.isoformat(),
             "required_window_kst": "15:30:30–15:39:30",
             "after_market_contamination": "UNVERIFIED",
@@ -718,8 +762,8 @@ def run_scheduled(asof):
         # Time-sensitive KRX regular-session fields are frozen first.
         krx_current = naver_krx_regular_snapshot()
         flow_map = naver_investor_flow_map(asof)
-        kospi_idx = index_history("KOSPI", asof, 100)
-        kosdaq_idx = index_history("KOSDAQ", asof, 100)
+        kospi_idx = index_history("KOSPI", asof, 20, 4)
+        kosdaq_idx = index_history("KOSDAQ", asof, 20, 4)
     except Exception as e:
         return fail_audit(asof, "SAFE_CAPTURE_SOURCE_FAILED", {
             "capture_started_kst": start.isoformat(),
@@ -965,7 +1009,12 @@ def run_scheduled(asof):
     benchmark_rows = []
     benchmark_gate = True
     for code, series in (("KOSPI", kospi_idx), ("KOSDAQ", kosdaq_idx)):
-        if not series or series[-1]["date"] != asof or series[-1].get("close") is None:
+        if (
+            not series
+            or len(series) < 61
+            or series[-1]["date"] != asof
+            or series[-1].get("close") is None
+        ):
             benchmark_gate = False
             continue
         benchmark_rows.append({
@@ -1060,6 +1109,8 @@ def run_scheduled(asof):
         "protection_gate": protection_gate,
         "benchmark_gate": benchmark_gate,
         "benchmark_rows": len(benchmark_rows),
+        "kospi_benchmark_history_rows": len(kospi_idx),
+        "kosdaq_benchmark_history_rows": len(kosdaq_idx),
         "investor_flow_capture_rows": len(flow_map),
         "feature_coverage": feature_cov,
         "active_feature_groups_at_70pct": active_features,
