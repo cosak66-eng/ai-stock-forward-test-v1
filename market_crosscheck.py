@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """V1.0 market data DIAGNOSTIC. Never authorizes predictions or edits data/."""
-import argparse, csv, json, os, re, sys, urllib.parse, urllib.request
+import argparse, csv, json, os, re, sys, traceback, urllib.parse, urllib.request
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -28,11 +28,18 @@ def normalize(ticker, close, volume, trading_value, source, date):
     return row
 
 
-def krx_fetch(asof):
+def krx_fetch(asof, diagnostics=None):
     from pykrx import stock
     result = {}
     for market in ('KOSPI', 'KOSDAQ'):
-        df = stock.get_market_ohlcv_by_ticker(asof, market=market, alternative=False)
+        try:
+            df = stock.get_market_ohlcv_by_ticker(asof, market=market, alternative=False)
+        except Exception as exc:
+            if diagnostics is not None:
+                diagnostics[market] = {'status': 'FETCH_EXCEPTION', 'exception_type': type(exc).__name__, 'error': str(exc)[:500], 'traceback': traceback.format_exc(limit=7)[-2500:]}
+            raise RuntimeError(f'KRX_{market}_FETCH_EXCEPTION:{type(exc).__name__}:{exc}') from exc
+        if diagnostics is not None:
+            diagnostics[market] = {'status': 'RETURNED', 'shape': list(df.shape) if df is not None else None, 'columns': [str(c) for c in df.columns] if df is not None else [], 'index_sample': [str(v) for v in df.index[:3]] if df is not None else []}
         if df is None or df.empty: raise RuntimeError(f'KRX_{market}_EMPTY')
         required = {'종가', '거래량', '거래대금'}
         if not required.issubset(df.columns): raise RuntimeError(f'KRX_{market}_MISSING_FIELDS:{list(df.columns)}')
@@ -80,8 +87,9 @@ def main():
     output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
     report = {'date':asof,'created_kst':datetime.now(ZoneInfo('Asia/Seoul')).isoformat(), 'diagnostic_only':True, 'prediction_eligible':False, 'data_cutoff_18_kst_proven':False, 'regular_session_proven':False, 'sources':{}, 'comparisons':{}, 'errors':[]}
     krx = {}
+    report['pykrx_diagnostics'] = {}
     try:
-        krx = krx_fetch(asof)
+        krx = krx_fetch(asof, report['pykrx_diagnostics'])
         report['sources']['pykrx']={'status':'OK', 'rows':len(krx)}
     except Exception as exc:
         report['sources']['pykrx']={'status':'ERROR', 'error':str(exc)[:500]}
