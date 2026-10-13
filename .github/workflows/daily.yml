@@ -1,3 +1,4 @@
+
 name: V1.0 Controlled Free Web Collector
 
 on:
@@ -9,8 +10,10 @@ on:
         default: "diagnostic"
 
   schedule:
-    # KST 15:31 and 15:36 = UTC 06:31 and 06:36, Monday-Friday.
-    # The collector itself enforces actual start/finish timestamps.
+    # Verification-week redundancy.
+    # UTC 06:15/20/25/30 = KST 15:15/20/25/30, Monday-Friday.
+    # Early starts wait inside collector until 15:30:30 KST.
+    # Any actual capture start after 15:39:30 KST hard-fails.
     - cron: "15,20,25,30 6 * * 1-5"
 
 permissions:
@@ -23,7 +26,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     env:
       TZ: Asia/Seoul
