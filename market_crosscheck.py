@@ -1,127 +1,162 @@
 #!/usr/bin/env python3
-"""V1.0 market data DIAGNOSTIC. Never authorizes predictions or edits data/."""
-import argparse, csv, json, os, re, sys, traceback, urllib.parse, urllib.request
+"""Read-only V1 market close diagnostic. Optional sources never block primary checks."""
+import argparse, csv, json, re, sys, urllib.parse, urllib.request
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-SAMPLE = ('005930', '000660', '035420', '005380', '035720')
-FIELDS = ('close', 'volume', 'trading_value')
+SAMPLE=('005930','000660','035420','005380','035720')
+HEADERS={'User-Agent':'Mozilla/5.0','Accept':'application/json, text/plain, */*'}
 
 
-def parse_num(value):
-    if isinstance(value, bool) or value is None: return None
+def integer(v):
+    if v is None or isinstance(v,bool): return None
     try:
-        x = float(str(value).replace(',', ''))
-        return int(x) if x.is_integer() else None
-    except (ValueError, TypeError, OverflowError): return None
+        from decimal import Decimal
+        x=Decimal(str(v).replace(',','').strip())
+        return int(x) if x.is_finite() and x==int(x) else None
+    except Exception: return None
 
 
-def normalize(ticker, close, volume, trading_value, source, date):
-    if not re.fullmatch(r'\d{6}', str(ticker)): return None
-    row = dict(ticker=str(ticker), date=date, source=source)
-    for k, v in zip(FIELDS, (close, volume, trading_value)):
-        row[k] = parse_num(v)
-    if row['close'] is None or row['close'] <= 0: return None
-    if row['volume'] is None or row['volume'] < 0: return None
-    if row['trading_value'] is None or row['trading_value'] < 0: return None
-    return row
+def code(v):
+    s=str(v or '').strip().upper()
+    if s.startswith('A') and len(s)==7: s=s[1:]
+    return s if re.fullmatch(r'\d{6}',s) else None
 
 
-def krx_fetch(asof, diagnostics=None):
-    from pykrx import stock
-    result = {}
-    for market in ('KOSPI', 'KOSDAQ'):
-        try:
-            df = stock.get_market_ohlcv_by_ticker(asof, market=market, alternative=False)
-        except Exception as exc:
-            if diagnostics is not None:
-                diagnostics[market] = {'status': 'FETCH_EXCEPTION', 'exception_type': type(exc).__name__, 'error': str(exc)[:500], 'traceback': traceback.format_exc(limit=7)[-2500:]}
-            raise RuntimeError(f'KRX_{market}_FETCH_EXCEPTION:{type(exc).__name__}:{exc}') from exc
-        if diagnostics is not None:
-            diagnostics[market] = {'status': 'RETURNED', 'shape': list(df.shape) if df is not None else None, 'columns': [str(c) for c in df.columns] if df is not None else [], 'index_sample': [str(v) for v in df.index[:3]] if df is not None else []}
-        if df is None or df.empty: raise RuntimeError(f'KRX_{market}_EMPTY')
-        required = {'종가', '거래량', '거래대금'}
-        if not required.issubset(df.columns): raise RuntimeError(f'KRX_{market}_MISSING_FIELDS:{list(df.columns)}')
-        count = 0
-        for code, r in df.iterrows():
-            rec = normalize(str(code).zfill(6), r['종가'], r['거래량'], r['거래대금'], 'PYKRX_KRX_DAILY', asof)
-            if rec is not None:
-                if rec['ticker'] in result: raise RuntimeError('DUPLICATE_TICKER:'+rec['ticker'])
-                result[rec['ticker']] = rec
-                count += 1
-        if count < 100: raise RuntimeError(f'KRX_{market}_TOO_FEW:{count}')
-    return result
+def make_row(ticker,date,source,close,volume=None,value=None):
+    ticker=code(ticker);close=integer(close);volume=integer(volume);value=integer(value)
+    if not ticker or not re.fullmatch(r'\d{8}',str(date)) or close is None or close<=0: return None
+    if volume is not None and volume<0 or value is not None and value<0:return None
+    return dict(ticker=ticker,date=date,source=source,close=close,volume=volume,trading_value=value)
 
 
-def daum_fetch_one(ticker, asof):
-    sym = 'A'+ticker
-    q = urllib.parse.urlencode(dict(symbolCode=sym, page=1, perPage=10, pagination='true'))
-    url = f'https://finance.daum.net/api/quote/{sym}/days?{q}'
-    req = urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0', 'Referer':f'https://finance.daum.net/quotes/{sym}', 'Accept':'application/json, text/plain, */*'})
-    with urllib.request.urlopen(req, timeout=18) as response:
-        if response.status != 200: raise RuntimeError('HTTP_'+str(response.status))
-        obj = json.loads(response.read(2_000_000).decode('utf-8'))
-    if not isinstance(obj, dict) or not isinstance(obj.get('data'), list): raise RuntimeError('INVALID_DAUM_SCHEMA')
-    for x in obj['data']:
-        if str(x.get('date',''))[:10].replace('-','') == asof:
-            return normalize(ticker, x.get('tradePrice'), x.get('accTradeVolume'), x.get('accTradePrice'), 'DAUM_DAILY', asof)
+def get_json(url,referer):
+    h=dict(HEADERS,Referer=referer)
+    with urllib.request.urlopen(urllib.request.Request(url,headers=h),timeout=20) as r:
+        if r.status!=200: raise ValueError('HTTP_'+str(r.status))
+        return json.loads(r.read(3_000_000).decode('utf-8'))
+
+
+def daum_one(ticker,date):
+    sym='A'+ticker
+    q=urllib.parse.urlencode({'symbolCode':sym,'page':1,'perPage':15,'pagination':'true'})
+    o=get_json(f'https://finance.daum.net/api/quote/{sym}/days?{q}',f'https://finance.daum.net/quotes/{sym}')
+    for x in o.get('data',[]):
+        if str(x.get('date',''))[:10].replace('-','')==date:
+            return make_row(ticker,date,'DAUM',x.get('tradePrice'),x.get('accTradeVolume'),x.get('accTradePrice'))
     return None
 
 
-def compare(a, b):
-    if not a or not b: return {'status':'MISSING_SOURCE', 'fields':{}}
-    if a['ticker'] != b['ticker'] or a['date'] != b['date']:
-        return {'status':'DATE_OR_TICKER_MISMATCH', 'fields':{}}
-    fields = {k: ('MATCH' if a[k] == b[k] else 'MISMATCH') for k in FIELDS}
-    return {'status':'MATCH_3_OF_3' if all(v=='MATCH' for v in fields.values()) else 'VALUE_MISMATCH', 'fields':fields}
+def walk(o):
+    if isinstance(o,list):
+        for x in o: yield from walk(x)
+    elif isinstance(o,dict):
+        yield o
+        for v in o.values():
+            if isinstance(v,(list,dict)): yield from walk(v)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('--date', help='YYYYMMDD; default current KST date')
-    ap.add_argument('--output', default='output/market_crosscheck')
-    args = ap.parse_args()
-    asof = args.date or datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y%m%d')
-    if not re.fullmatch(r'\d{8}', asof): ap.error('invalid date')
-    output = Path(args.output); output.mkdir(parents=True, exist_ok=True)
-    report = {'date':asof,'created_kst':datetime.now(ZoneInfo('Asia/Seoul')).isoformat(), 'diagnostic_only':True, 'prediction_eligible':False, 'data_cutoff_18_kst_proven':False, 'regular_session_proven':False, 'sources':{}, 'comparisons':{}, 'errors':[]}
-    krx = {}
-    report['pykrx_diagnostics'] = {}
+def pick(d,*keys):
+    for k in keys:
+        if k in d and d[k] not in (None,''):return d[k]
+    return None
+
+
+def naver_rows(date,max_pages=45):
+    """Naver market list. A date must be explicitly provided by response for strict matching."""
+    rows={}; metadata={'pages':0,'undated_rows':0,'raw_records':0,'sample_keys':[]}
+    for page in range(max_pages):
+        q=urllib.parse.urlencode({'tradeType':'KRX','marketType':'ALL','orderType':'marketSum','startIdx':page,'pageSize':100})
+        o=get_json('https://stock.naver.com/api/domestic/market/stock/default?'+q,'https://stock.naver.com/')
+        new=0; seen=0
+        for d in walk(o):
+            ticker=code(pick(d,'itemCode','stockCode','code','symbolCode','ticker'))
+            if not ticker:continue
+            seen+=1;metadata['raw_records']+=1
+            if not metadata['sample_keys']:metadata['sample_keys']=list(d.keys())[:35]
+            raw_date=pick(d,'bizdate','bizDate','tradeDate','tradingDate','baseDate','date')
+            ds=re.sub(r'\D','',str(raw_date or ''))[:8]
+            if ds!=date:
+                metadata['undated_rows']+=1
+                continue
+            row=make_row(ticker,date,'NAVER',pick(d,'closePrice','close','tradePrice','currentPrice'),pick(d,'accTradeVolume','tradeVolume','volume'),pick(d,'accTradePrice','tradeAmount','tradingValue','tradingAmount'))
+            if row:
+                if ticker not in rows:new+=1
+                rows[ticker]=row
+        metadata['pages']+=1
+        if seen==0 or (page>0 and new==0):break
+    return rows,metadata
+
+
+def compare_primary(n,d):
+    if n is None or d is None:return {'status':'PRIMARY_MISSING','fields':{}}
+    if n['ticker']!=d['ticker'] or n['date']!=d['date']:return {'status':'PRIMARY_DATE_MISMATCH','fields':{}}
+    fields={}
+    for k in ('close','volume','trading_value'):
+        if n[k] is None or d[k] is None:fields[k]='UNAVAILABLE'
+        else:fields[k]='MATCH' if n[k]==d[k] else 'MISMATCH'
+    status='PRIMARY_MATCH' if all(v=='MATCH' for v in fields.values()) else 'PRIMARY_MISMATCH' if 'MISMATCH' in fields.values() else 'PRIMARY_INCOMPLETE'
+    return {'status':status,'fields':fields}
+
+
+def optional_csv(path,date):
+    """Optional evidence: source,ticker,date,close. Missing file/rows are SKIPPED."""
+    result={};warnings=[]
+    if not path.exists():return result,['OPTIONAL_CSV_ABSENT']
     try:
-        krx = krx_fetch(asof, report['pykrx_diagnostics'])
-        report['sources']['pykrx']={'status':'OK', 'rows':len(krx)}
-    except Exception as exc:
-        report['sources']['pykrx']={'status':'ERROR', 'error':str(exc)[:500]}
-        report['errors'].append('PYKRX_FETCH_FAILED')
-    daum = {}
+        with path.open(encoding='utf-8-sig',newline='') as f:
+            for r in csv.DictReader(f):
+                source=str(r.get('source','')).strip().upper()
+                if source not in ('FNGUIDE','INVESTING','YAHOO','NATE'):continue
+                if str(r.get('date','')).replace('-','')!=date:continue
+                row=make_row(r.get('ticker'),date,source,r.get('close'))
+                if row:result[(source,row['ticker'])]=row
+                else:warnings.append('OPTIONAL_INVALID_ROW_'+source)
+    except Exception as e:warnings.append('OPTIONAL_CSV_READ_FAILED:'+type(e).__name__)
+    return result,warnings
+
+
+def main(argv=None):
+    p=argparse.ArgumentParser();p.add_argument('--date');p.add_argument('--output',default='output/market_crosscheck');p.add_argument('--optional-csv',default='evidence/four_source_observations.csv');a=p.parse_args(argv)
+    date=a.date or datetime.now(ZoneInfo('Asia/Seoul')).strftime('%Y%m%d')
+    if not re.fullmatch(r'\d{8}',date):p.error('date must be YYYYMMDD')
+    out=Path(a.output);out.mkdir(parents=True,exist_ok=True)
+    report={'date':date,'diagnostic_only':True,'prediction_eligible':False,'regular_session_proven':False,'cutoff_18_kst_proven':False,'primary':{},'optional':{},'comparisons':{},'warnings':[],'errors':[]}
+    try:
+        naver,meta=naver_rows(date)
+        report['primary']['naver']={'rows':len(naver),'metadata':meta}
+    except Exception as e:
+        naver={};report['primary']['naver']={'rows':0,'error':type(e).__name__+':'+str(e)[:250]};report['errors'].append('NAVER_FETCH_FAILED')
+    daum={}
     for ticker in SAMPLE:
         try:
-            rec = daum_fetch_one(ticker, asof)
-            if rec: daum[ticker] = rec
-            else: report['errors'].append('DAUM_MISSING_'+ticker)
-        except Exception as exc:
-            report['errors'].append('DAUM_'+ticker+':'+str(exc)[:150])
-    report['sources']['daum']={'status':'OK' if len(daum)==len(SAMPLE) else 'PARTIAL_OR_FAILED','rows':len(daum)}
+            row=daum_one(ticker,date)
+            if row:daum[ticker]=row
+        except Exception as e:report['errors'].append('DAUM_'+ticker+':'+type(e).__name__+':'+str(e)[:100])
+    report['primary']['daum']={'rows':len(daum)}
+    opt,warnings=optional_csv(Path(a.optional_csv),date);report['warnings']+=warnings
     for ticker in SAMPLE:
-        report['comparisons'][ticker] = compare(krx.get(ticker),daum.get(ticker))
-    match_count=sum(x['status']=='MATCH_3_OF_3' for x in report['comparisons'].values())
-    report['sample_match_count']=match_count
-    report['sample_count']=len(SAMPLE)
-    report['crosscheck_sample_pass']=(match_count==len(SAMPLE))
-    report['full_universe_count']=len(krx)
-    report['full_universe_price_coverage_diagnostic']=(len(krx)>=1000)
-    report['status']='SAMPLE_MATCH_DIAGNOSTIC_ONLY' if report['crosscheck_sample_pass'] else 'CROSSCHECK_FAILED'
-    # A 20:00 retrieval cannot independently prove a snapshot existed before the 18:00 information cutoff.
-    # No automatic write to data/, no revision of historical audit, no Top20/prediction generation.
-    (output/'market_crosscheck_report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
-    with (output/'market_crosscheck_sample.csv').open('w',encoding='utf-8-sig',newline='') as f:
-        writer=csv.writer(f);writer.writerow(['ticker','source','close','volume','trading_value','date'])
-        for ticker in SAMPLE:
-            for rec in (krx.get(ticker),daum.get(ticker)):
-                if rec:writer.writerow([rec['ticker'],rec['source'],rec['close'],rec['volume'],rec['trading_value'],rec['date']])
-    print(json.dumps({k:report[k] for k in ('status','sources','sample_match_count','sample_count','errors')},ensure_ascii=False,indent=2))
-    return 0 if report['crosscheck_sample_pass'] else 2
+        comparison=compare_primary(naver.get(ticker),daum.get(ticker))
+        comparison['optional']={}
+        for source in ('FNGUIDE','INVESTING','YAHOO','NATE'):
+            r=opt.get((source,ticker))
+            base=daum.get(ticker) or naver.get(ticker)
+            state='SKIPPED' if r is None else 'NO_PRIMARY' if base is None else 'MATCH' if r['close']==base['close'] else 'WARNING_MISMATCH'
+            comparison['optional'][source]=state
+        report['comparisons'][ticker]=comparison
+    report['optional']['available_rows']=len(opt)
+    report['primary_match_count']=sum(x['status']=='PRIMARY_MATCH' for x in report['comparisons'].values())
+    report['primary_pass']=report['primary_match_count']==len(SAMPLE)
+    report['status']='PRIMARY_MATCH_DIAGNOSTIC_ONLY' if report['primary_pass'] else 'PRIMARY_NOT_VERIFIED'
+    (out/'market_crosscheck_report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+    with (out/'market_crosscheck_sample.csv').open('w',encoding='utf-8-sig',newline='') as f:
+        w=csv.writer(f);w.writerow(['ticker','source','date','close','volume','trading_value'])
+        for t in SAMPLE:
+            for r in (naver.get(t),daum.get(t)):
+                if r:w.writerow([r[k] for k in ('ticker','source','date','close','volume','trading_value')])
+    print(json.dumps({'status':report['status'],'primary':report['primary'],'optional':report['optional'],'warnings':report['warnings'],'errors':report['errors']},ensure_ascii=False,indent=2))
+    # Exit code 2 is reserved for genuine primary failure; optional failures never affect it.
+    return 0 if report['primary_pass'] else 2
 
-
-if __name__=='__main__': sys.exit(main())
+if __name__=='__main__':sys.exit(main())
