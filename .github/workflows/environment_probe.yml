@@ -1,0 +1,47 @@
+name: V1 Environment Connectivity Diagnostic
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 11 * * 1-5' # 20:00 KST, diagnostic only
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Offline unit tests
+        run: python -m unittest -v test_environment_probe.py
+      - name: Install optional market libraries (log failures; continue to network test)
+        shell: bash
+        run: |
+          mkdir -p output/environment
+          python -m pip install -r requirements-diagnostic.txt > output/environment/pip_install.log 2>&1
+          result=$?
+          echo "pip_exit_code=$result" | tee output/environment/install_status.txt
+          python -m pip check >> output/environment/pip_install.log 2>&1 || true
+          exit 0
+      - name: Diagnose DNS, HTTP and response structure
+        run: python environment_probe.py --output output/environment
+      - name: Report verified status (does not certify price data)
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          x=json.load(open('output/environment/environment_probe.json'))
+          print('DEPENDENCIES_OK:',x['dependency_pass'])
+          print('REACHABLE_SITES:',x['http_reachable'])
+          print('DATA_VERIFIED:',x['data_verified'])
+          PY
+      - name: Upload reports even when errors occur
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-env-diagnostic-${{ github.run_id }}
+          path: output/environment/**
+          retention-days: 30
+          if-no-files-found: warn
