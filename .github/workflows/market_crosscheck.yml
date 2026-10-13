@@ -1,6 +1,8 @@
 name: V1 Market Price Crosscheck Diagnostic
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 11 * * 1-5' # 20:00 KST, weekdays
 permissions:
   contents: read
 jobs:
@@ -12,13 +14,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install data library
-        run: python -m pip install pykrx pandas requests
       - name: Offline regression tests
         run: python -m unittest -v test_market_crosscheck.py
-      - name: Live same-day crosscheck (diagnostic only)
-        run: python market_crosscheck.py --output output/market_crosscheck
-      - name: Save results even on failure
+      - name: Run primary diagnostic
+        shell: bash
+        run: |
+          mkdir -p output/market_crosscheck
+          python market_crosscheck.py --output output/market_crosscheck
+      - name: Upload diagnostic report
         if: always()
         uses: actions/upload-artifact@v4
         with:
