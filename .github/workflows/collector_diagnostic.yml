@@ -1,0 +1,23 @@
+name: Collector Field Diagnostics
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Inspect source response without altering prediction data
+        run: python collector_diagnostic.py
+      - name: Upload diagnostic report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: collector-diagnostic-report
+          path: collector_diagnostic_report.json
+          if-no-files-found: warn
