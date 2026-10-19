@@ -1,0 +1,13 @@
+{
+  "pass": false,
+  "status": "FAIL — DATA PIPELINE",
+  "collector_revision": "FREEWEB-1.2.4-CONTROLLED",
+  "schema_version": "V10-DATA-1.2",
+  "asof_date": "20261019",
+  "error": "UNSAFE_CAPTURE_TIME",
+  "collected_at_kst": "2026-10-19T15:51:56.045892+09:00",
+  "runner_started_kst": "2026-10-19T15:51:56.045882+09:00",
+  "capture_started_kst": "2026-10-19T15:51:56.045885+09:00",
+  "required_window_kst": "15:30:30–15:39:30",
+  "after_market_contamination": "UNVERIFIED"
+}
