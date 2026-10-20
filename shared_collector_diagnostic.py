@@ -19,26 +19,16 @@ def run(out_dir,tickers):
   try:
    prices=m.fetch_naver_history(ticker,140,get_json=lambda url:json.loads(text(url)),get_text=text,asof=today)
    record={'ticker':ticker,'price_rows':len(prices),'latest_date':prices[0]['date'],'route':prices[0]['price_history_route'],'price_probe_pass':len(prices)>=120}
-   sym='A'+ticker
-   url=f'https://finance.daum.net/api/quote/{sym}/days?symbolCode={sym}&page=1&perPage=140&pagination=true'
-   try:
-    raw,charset=m.request_bytes(url,{'Referer':f'https://finance.daum.net/quotes/{sym}'},timeout=15,tries=2)
+   def daum_json(url,headers):
+    raw,charset=m.request_bytes(url,headers,timeout=15,tries=2)
     name=ticker+'_daum.raw';(out/name).write_bytes(raw)
     files.append({'name':name,'url':url,'size':len(raw),'sha256':hashlib.sha256(raw).hexdigest()})
-    payload=json.loads(m.decode_text(raw,charset));values=[]
-    for row in payload.get('data',[]):
-     day=str(row.get('date',''))[:10]
-     try:datetime.fromisoformat(day)
-     except ValueError:continue
-     def exact(k):
-      x=row.get(k)
-      if isinstance(x,bool):return None
-      try:return float(str(x).replace(',',''))
-      except (ValueError,TypeError):return None
-     values.append({'date':day,'open':exact('openingPrice'),'high':exact('highPrice'),'low':exact('lowPrice'),'close':exact('tradePrice'),'volume':exact('accTradeVolume'),'trading_value':exact('accTradePrice')})
-    error=None
+    return json.loads(m.decode_text(raw,charset))
+   try:values=m.fetch_daum_prior(ticker,today.replace('-',''),140,get_json=daum_json);error=None
    except (RuntimeError,ValueError,OSError) as exc:values=[];error=str(exc)[:400]
    _,parity=m.v1_prior_history(prices,values,today)
+   native,profile=m.v1_profile_history(prices,values,today)
+   record.update({'v1_native_profile':profile})
    record.update({'v1_prior_field_parity':parity,'actual_value_source_error':error})
   except (RuntimeError,ValueError,OSError) as exc:record={'ticker':ticker,'price_probe_pass':False,'error':str(exc)[:500]}
   records.append(record)

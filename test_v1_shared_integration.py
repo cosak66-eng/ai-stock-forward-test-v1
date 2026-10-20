@@ -13,11 +13,11 @@ class V1IntegrationTests(unittest.TestCase):
   for name,value in expected['constants'].items():self.assertEqual(getattr(c,name),value,name)
   gate=next(n for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='pass_all' for t in n.targets))
   self.assertEqual(hashlib.sha256(ast.dump(gate,include_attributes=False).encode()).hexdigest(),expected['pass_all_ast_sha256'])
- def test_v2_history_is_used_but_today_and_missing_value_are_excluded(self):
+ def test_missing_v1_native_history_cannot_be_replaced_with_v2_bars(self):
   p={'date':'2026-10-19','open':100.,'high':110.,'low':90.,'close':105.,'volume':20.,'trading_value':None,'price_history_route':'NAVER_FCHART_XML'}
   with patch.object(c.shared,'fetch_naver_history',return_value=[p,dict(p,date='2026-10-20')]),patch.object(c,'daum_daily_prior',side_effect=RuntimeError('value source unavailable')):
    t,rows,err=c.fetch_one_history({'ticker':'005930'},'20261020')
-  self.assertIsNone(err);self.assertEqual(len(rows),1);self.assertIsNone(rows[0]['trading_value']);self.assertEqual(rows[0]['date'],'20261019')
+  self.assertIsNotNone(err);self.assertEqual(rows,[])
  def test_late_start_performs_no_market_fetch(self):
   late=datetime.fromisoformat('2026-10-20T15:46:00+09:00')
   with tempfile.TemporaryDirectory() as tmp,patch.object(c,'OUT',Path(tmp)),patch.object(c,'valid_prior_run',return_value=False),patch.object(c,'now_kst',return_value=late),patch.object(c,'naver_krx_regular_snapshot') as fetch:

@@ -363,30 +363,8 @@ def daum_sector_map(market):
 # Historical bars: current date is deliberately excluded
 # ---------------------------------------------------------------------------
 
-def daum_daily_prior(ticker, asof, count=140):
-    sym = "A" + ticker
-    q = urllib.parse.urlencode({
-        "symbolCode": sym, "page": 1, "perPage": count, "pagination": "true",
-    })
-    h = dict(DAUM_HEADERS)
-    h["Referer"] = f"https://finance.daum.net/quotes/{sym}"
-    obj = http_json(f"https://finance.daum.net/api/quote/{sym}/days?{q}", h)
-    out = []
-    for x in obj.get("data") or []:
-        ds = str(x.get("date") or "")[:10].replace("-", "")
-        if not re.fullmatch(r"\d{8}", ds) or ds >= asof:
-            continue
-        out.append({
-            "date": ds,
-            "open": nnum(x.get("openingPrice")),
-            "high": nnum(x.get("highPrice")),
-            "low": nnum(x.get("lowPrice")),
-            "close": nnum(x.get("tradePrice")),
-            "volume": nnum(x.get("accTradeVolume")),
-            "trading_value": nnum(x.get("accTradePrice")),
-        })
-    out.sort(key=lambda z: z["date"])
-    return out
+def daum_daily_prior(ticker,asof,count=140):
+    return shared.fetch_daum_prior(ticker,asof,count,get_json=lambda url,headers:http_json(url,headers),headers=DAUM_HEADERS)
 
 
 HISTORY_SOURCE_AUDIT={}
@@ -395,12 +373,18 @@ HISTORY_SOURCE_LOCK=threading.Lock()
 def fetch_one_history(item,asof):
     ticker=item['ticker'];iso=asof[:4]+'-'+asof[4:6]+'-'+asof[6:8]
     try:
-        prices=shared.fetch_naver_history(ticker,140,get_json=lambda url:http_json(url,NAVER_HEADERS),
-            get_text=lambda url,accept='application/xml, text/plain, */*':http_text(url,{**NAVER_HEADERS,'Accept':accept}),asof=iso)
-        try:values=daum_daily_prior(ticker,asof,140);value_error=None
-        except (RuntimeError,ValueError,OSError) as exc:values=[];value_error=str(exc)[:400]
-        bars,audit=shared.v1_prior_history(prices,values,iso)
-        audit.update({'price_route':prices[0]['price_history_route'],'value_source_error':value_error})
+        # Preserve V1's existing whole native series. NAVER is a shadow
+        # comparison on two liquid stocks, not a replacement for V1 prices.
+        values=daum_daily_prior(ticker,asof,140)
+        prices=[];comparison_error=None
+        if ticker in {'005930','000660'}:
+            try:
+                prices=shared.fetch_naver_history(ticker,140,get_json=lambda url:http_json(url,NAVER_HEADERS),
+                    get_text=lambda url,accept='application/xml, text/plain, */*':http_text(url,{**NAVER_HEADERS,'Accept':accept}),asof=iso)
+            except (RuntimeError,ValueError,OSError) as exc:comparison_error=str(exc)[:400]
+        bars,audit=shared.v1_profile_history(prices,values,iso)
+        audit.update({'price_route':'DAUM_DAILY_V1_EXISTING','comparison_source_error':comparison_error})
+        if not bars:raise RuntimeError('V1_NATIVE_HISTORY_DATA_NOT_AVAILABLE')
         with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]=audit
         return ticker,bars,None
     except (RuntimeError,ValueError,OSError) as exc:
@@ -890,7 +874,7 @@ def run_scheduled(asof):
 
     write_json(OUT/f"history_source_audit_{asof}.json",{
         'shared_collector_version':shared.VERSION,'tickers':HISTORY_SOURCE_AUDIT,
-        'actual_value_policy':'NUMERIC_ORIGINAL_FIELD_AND_IDENTICAL_OHLCV',
+        'actual_value_policy':'V1_EXISTING_WHOLE_SERIES_NO_CROSS_VENDOR_MERGE',
         'no_close_times_volume':True,'venue_or_adjustment_certification':False})
     rows = []
     for item in universe:

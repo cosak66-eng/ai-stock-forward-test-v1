@@ -1,6 +1,6 @@
 {
-  "version": "COMMON-MARKET-DATA-0.1.0",
-  "sha256": "b1cb0e52202ea776257885f51efc824c63aba24aa9431af78f95179a21b7d0bf",
+  "version": "COMMON-MARKET-DATA-0.1.1",
+  "sha256": "1a5b356e29313cfcef93612f5c897987b781c851fead8a8370c99fd869bd2eff",
   "canonical_repository": "cosak66-eng/ai-stock-forward-test-v2",
   "model_logic_changed": false
 }

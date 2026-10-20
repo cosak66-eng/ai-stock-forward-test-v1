@@ -1,4 +1,4 @@
-"""Common NAVER acquisition primitives, vendored identically in V1 and V2.
+"""Shared acquisition primitives with V1/V2 data profiles, vendored identically.
 
 Acquisition is shared; model eligibility, capture windows and journals are not.
 No orders, imputation, close*volume monetary estimates or source certification.
@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime,timedelta,date
 from typing import Any,Iterable
 from zoneinfo import ZoneInfo
-VERSION='COMMON-MARKET-DATA-0.1.0'
+VERSION='COMMON-MARKET-DATA-0.1.1'
 TZ=ZoneInfo('Asia/Seoul')
 DEFAULT_HEADERS={'User-Agent':'Mozilla/5.0','Referer':'https://stock.naver.com/','Accept':'application/json, text/plain, */*'}
 PERMANENT_HTTP={400,401,403,404,410,422}
@@ -496,3 +496,55 @@ def sha256_file(path):
     with open(path,'rb') as f:
         for chunk in iter(lambda:f.read(1024*1024),b''):h.update(chunk)
     return h.hexdigest()
+
+
+def numeric_source_field(value):
+    if value is None or isinstance(value,(bool,dict,list,tuple)):return None
+    try:x=float(str(value).replace(',','').strip())
+    except (ValueError,TypeError):return None
+    return x if math.isfinite(x) else None
+
+def fetch_daum_prior(ticker,asof,count=140,*,get_json=None,headers=None):
+    """Existing V1 whole OHLCV+actual-value series; no NAVER field transplant."""
+    datetime.strptime(asof,'%Y%m%d')
+    if not re.fullmatch(r'[0-9A-Z]{6}',ticker) or not 1<=count<=500:raise ValueError('Invalid history request')
+    symbol='A'+ticker
+    query=urllib.parse.urlencode({'symbolCode':symbol,'page':1,'perPage':count,'pagination':'true'})
+    h={**DEFAULT_HEADERS,**(headers or {}),'Referer':f'https://finance.daum.net/quotes/{symbol}'}
+    payload=(get_json or (lambda url,headers:request_json(url,headers)))(f'https://finance.daum.net/api/quote/{symbol}/days?{query}',h)
+    if not isinstance(payload,dict) or not isinstance(payload.get('data'),list):raise RuntimeError('Invalid DAUM history schema')
+    out=[];seen=set()
+    for raw in payload['data']:
+        day=str(raw.get('date') or '')[:10].replace('-','')
+        if not re.fullmatch(r'\d{8}',day) or day>=asof:continue
+        datetime.strptime(day,'%Y%m%d')
+        if day in seen:raise RuntimeError('Duplicate DAUM history date')
+        seen.add(day)
+        row={'date':day}
+        for target,key in [('open','openingPrice'),('high','highPrice'),('low','lowPrice'),('close','tradePrice'),('volume','accTradeVolume'),('trading_value','accTradePrice')]:row[target]=numeric_source_field(raw.get(key))
+        out.append(row)
+    out.sort(key=lambda r:r['date'])
+    return out
+
+def v1_profile_history(naver_rows,original_v1_rows,asof):
+    """Preserve the existing V1 provider's entire series when vendor bases differ.
+
+    NAVER/DAUM equality is diagnostic. A mismatch never transfers DAUM monetary
+    value to a NAVER bar and never replaces an existing V1 model input.
+    """
+    _,parity=v1_prior_history(naver_rows,original_v1_rows,asof)
+    cutoff=date.fromisoformat(asof).strftime('%Y%m%d');out=[];seen=set()
+    for raw in original_v1_rows:
+        day=str(raw['date']).replace('-','')
+        datetime.strptime(day,'%Y%m%d')
+        if day>=cutoff:continue
+        if day in seen:raise RuntimeError('Duplicate V1 native history date')
+        seen.add(day)
+        row={'date':day}
+        for k in ('open','high','low','close','volume','trading_value'):row[k]=numeric_source_field(raw.get(k))
+        out.append(row)
+    out.sort(key=lambda r:r['date'])
+    audit={**parity,'selected_profile':'V1_EXISTING_DAUM_SERIES','selected_native_rows':len(out),
+           'selected_actual_value_rows':sum(r['trading_value'] is not None for r in out),
+           'cross_vendor_merge_performed':False,'naver_comparison_probed':bool(naver_rows)}
+    return out,audit

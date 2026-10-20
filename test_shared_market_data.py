@@ -85,4 +85,14 @@ class SharedTests(unittest.TestCase):
   capture={'005930':{'market':'0','company':'삼성전자','close':999}}
   r=m.v1_universe_from_capture(capture);self.assertEqual(r[0]['market'],'KOSPI');self.assertNotIn('close',r[0])
 
+ def test_v1_profile_retains_the_original_whole_series_on_vendor_disagreement(self):
+  n=self.row();d=self.row();d.update(date='20261019',close=106.,volume=22.,trading_value=2150.)
+  rows,a=m.v1_profile_history([n],[d],'2026-10-20')
+  self.assertEqual(rows[0]['close'],106.);self.assertEqual(rows[0]['volume'],22.);self.assertEqual(rows[0]['trading_value'],2150.)
+  self.assertEqual(a['value_mismatch_bars'],1);self.assertFalse(a['cross_vendor_merge_performed'])
+ def test_shared_daum_parser_preserves_complete_original_numeric_rows(self):
+  data={'data':[{'date':'2026-10-19 00:00:00','openingPrice':100,'highPrice':110,'lowPrice':90,'tradePrice':105,'accTradeVolume':20,'accTradePrice':2100}, {'date':'2026-10-20 00:00:00','tradePrice':999}]}
+  rows=m.fetch_daum_prior('005930','20261020',get_json=lambda u,h:data)
+  self.assertEqual(rows,[{'date':'20261019','open':100.,'high':110.,'low':90.,'close':105.,'volume':20.,'trading_value':2100.}])
+
 if __name__=='__main__':unittest.main()
