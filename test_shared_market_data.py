@@ -82,8 +82,8 @@ class SharedTests(unittest.TestCase):
    rows=m.fetch_naver_universe(get_json=get)
   self.assertEqual(len(rows),1);self.assertEqual(len(calls),2);self.assertIn('startIdx=1',calls[1])
  def test_v1_universe_reuses_frozen_metadata_only(self):
-  capture={'005930':{'market':'0','company':'삼성전자','close':999}}
-  r=m.v1_universe_from_capture(capture);self.assertEqual(r[0]['market'],'KOSPI');self.assertNotIn('close',r[0])
+  capture={'005930':{'market':'0','company':'삼성전자','close':999},'0001A0':{'market':'1','company':'excluded by frozen V1 numeric-code rule'}}
+  r=m.v1_universe_from_capture(capture);self.assertEqual(len(r),1);self.assertEqual(r[0]['market'],'KOSPI');self.assertNotIn('close',r[0])
 
  def test_v1_profile_retains_the_original_whole_series_on_vendor_disagreement(self):
   n=self.row();d=self.row();d.update(date='20261019',close=106.,volume=22.,trading_value=2150.)

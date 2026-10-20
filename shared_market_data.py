@@ -486,7 +486,7 @@ def v1_universe_from_capture(capture):
     rows=[]
     for ticker,record in sorted(capture.items()):
         market={'0':'KOSPI','1':'KOSDAQ','KOSPI':'KOSPI','KOSDAQ':'KOSDAQ'}.get(str(record.get('market','')).upper())
-        if normalize_code(ticker) and market:
+        if normalize_code(ticker) and ticker.isdigit() and market:
             rows.append({'ticker':ticker,'company':record.get('company',''),'market':market,'universe_source':'NAVER_FROZEN_CAPTURE'})
     return rows
 
