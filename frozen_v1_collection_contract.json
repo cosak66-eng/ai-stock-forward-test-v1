@@ -1,0 +1,25 @@
+{
+  "functions": {
+    "pct_return": "dba3677258c6f6218690992c581bb659033016b2fbc66d4905134f9842ac1b9b",
+    "ma_gap": "595acc3be83c6a17320ccf9c8c23849b66351ad303b3e58734a459b78b7d3960",
+    "rv20": "5769f5e1464c327f7f147d0e0b633c439c6a0638e9099e72be07d0751686bc62",
+    "median20_value": "dcfcfd4780f80092c70c3204eaf3d2c44b0bcb71a6f325e77d6340e6996fc502",
+    "volume_ratio20": "fabeed2e763e230756efa2e5e84ce4b033f7dc9a29f06650ad58704fb7cc3edb",
+    "mdd60": "74a5b38cdc7979b70fee4177a2c8a5cd82c78fe90cf2f58641decff41a399ac2",
+    "max_gap20": "072f496e6dcc117655f38bf6d32c9ac03f9de05e7485942c8af15144c5aaaa47",
+    "coverage": "7cc0edb74fa3014ec2557a6d5a3ea0c25f5fe48f228601147b324eb6ef152e92",
+    "excluded_name": "c1051308e9c7bc7cca9751309e9a161277addb039bddfb25aaca1ba505d49bf8"
+  },
+  "constants": {
+    "MIN_PRICE": 1000,
+    "MIN_MEDIAN_VALUE20": 3000000000,
+    "MIN_NORMAL20": 18,
+    "MIN_HISTORY_BARS": 120,
+    "MIN_SNAPSHOT_ROWS": 1000,
+    "MIN_SECTOR_COVERAGE": 0.7,
+    "MIN_FEATURE_COVERAGE": 0.7,
+    "MAX_HISTORY_ERROR_RATIO": 0.05,
+    "MAX_HISTORY_ERRORS_ABS": 50
+  },
+  "pass_all_ast_sha256": "1dd470ebafde79a4dd0b6245533681fca8d7ea55c5ab8c512aaf75428addcf7b"
+}
