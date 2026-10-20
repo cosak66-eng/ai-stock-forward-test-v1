@@ -45,13 +45,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, time as dt_time
 from pathlib import Path
 from zoneinfo import ZoneInfo
+import threading
+import shared_market_data as shared
 
 TZ = ZoneInfo("Asia/Seoul")
 OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2.4-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.6-CONTROLLED"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -139,21 +141,8 @@ def record_dicts(obj):
             yield from record_dicts(v)
 
 
-def http_bytes(url, headers=None, timeout=30, tries=4):
-    h = {"User-Agent": UA}
-    if headers:
-        h.update(headers)
-    last = None
-    for i in range(tries):
-        try:
-            req = urllib.request.Request(url, headers=h)
-            with urllib.request.urlopen(req, timeout=timeout) as r:
-                return r.read(), (r.headers.get_content_charset() or "")
-        except Exception as e:
-            last = e
-            if i + 1 < tries:
-                time.sleep(1.0 + i * 1.4 + random.random() * 0.4)
-    raise RuntimeError(f"HTTP failed: {url} :: {last}")
+def http_bytes(url,headers=None,timeout=30,tries=4):
+    return shared.request_bytes(url,{"User-Agent":UA,**(headers or {})},timeout,tries)
 
 
 def http_text(url, headers=None, timeout=30):
@@ -176,12 +165,8 @@ def write_json(path: Path, obj):
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def sha256_file(path: Path):
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def sha256_file(path):
+    return shared.sha256_file(path)
 
 
 def valid_prior_run(asof):
@@ -192,7 +177,6 @@ def valid_prior_run(asof):
         x = json.loads(p.read_text(encoding="utf-8"))
         return (
             x.get("pass") is True
-            and x.get("collector_revision") == COLLECTOR_REVISION
             and x.get("asof_date") == asof
         )
     except Exception:
@@ -379,38 +363,33 @@ def daum_sector_map(market):
 # Historical bars: current date is deliberately excluded
 # ---------------------------------------------------------------------------
 
-def daum_daily_prior(ticker, asof, count=140):
-    sym = "A" + ticker
-    q = urllib.parse.urlencode({
-        "symbolCode": sym, "page": 1, "perPage": count, "pagination": "true",
-    })
-    h = dict(DAUM_HEADERS)
-    h["Referer"] = f"https://finance.daum.net/quotes/{sym}"
-    obj = http_json(f"https://finance.daum.net/api/quote/{sym}/days?{q}", h)
-    out = []
-    for x in obj.get("data") or []:
-        ds = str(x.get("date") or "")[:10].replace("-", "")
-        if not re.fullmatch(r"\d{8}", ds) or ds >= asof:
-            continue
-        out.append({
-            "date": ds,
-            "open": nnum(x.get("openingPrice")),
-            "high": nnum(x.get("highPrice")),
-            "low": nnum(x.get("lowPrice")),
-            "close": nnum(x.get("tradePrice")),
-            "volume": nnum(x.get("accTradeVolume")),
-            "trading_value": nnum(x.get("accTradePrice")),
-        })
-    out.sort(key=lambda z: z["date"])
-    return out
+def daum_daily_prior(ticker,asof,count=140):
+    return shared.fetch_daum_prior(ticker,asof,count,get_json=lambda url,headers:http_json(url,headers),headers=DAUM_HEADERS)
 
 
-def fetch_one_history(item, asof):
-    t = item["ticker"]
+HISTORY_SOURCE_AUDIT={}
+HISTORY_SOURCE_LOCK=threading.Lock()
+
+def fetch_one_history(item,asof):
+    ticker=item['ticker'];iso=asof[:4]+'-'+asof[4:6]+'-'+asof[6:8]
     try:
-        return t, daum_daily_prior(t, asof, 140), None
-    except Exception as e:
-        return t, [], str(e)
+        # Preserve V1's existing whole native series. NAVER is a shadow
+        # comparison on two liquid stocks, not a replacement for V1 prices.
+        values=daum_daily_prior(ticker,asof,140)
+        prices=[];comparison_error=None
+        if ticker in {'005930','000660'}:
+            try:
+                prices=shared.fetch_naver_history(ticker,140,get_json=lambda url:http_json(url,NAVER_HEADERS),
+                    get_text=lambda url,accept='application/xml, text/plain, */*':http_text(url,{**NAVER_HEADERS,'Accept':accept}),asof=iso)
+            except (RuntimeError,ValueError,OSError) as exc:comparison_error=str(exc)[:400]
+        bars,audit=shared.v1_profile_history(prices,values,iso)
+        audit.update({'price_route':'DAUM_DAILY_V1_EXISTING','comparison_source_error':comparison_error})
+        if not bars:raise RuntimeError('V1_NATIVE_HISTORY_DATA_NOT_AVAILABLE')
+        with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]=audit
+        return ticker,bars,None
+    except (RuntimeError,ValueError,OSError) as exc:
+        with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]={'status':'DATA_NOT_AVAILABLE','error':str(exc)[:500]}
+        return ticker,[],str(exc)
 
 
 # ---------------------------------------------------------------------------
@@ -647,6 +626,7 @@ def fail_audit(asof, error, extra=None, exit_code=2):
         "status": "FAIL — DATA PIPELINE",
         "collector_revision": COLLECTOR_REVISION,
         "schema_version": SCHEMA_VERSION,
+        "shared_collector_version": shared.VERSION,
         "asof_date": asof,
         "error": error,
         "collected_at_kst": now_kst().isoformat(),
@@ -668,6 +648,7 @@ def run_diagnostic(asof):
         "prediction_eligible": False,
         "collector_revision": COLLECTOR_REVISION,
         "schema_version": SCHEMA_VERSION,
+        "shared_collector_version": shared.VERSION,
         "asof_date": asof,
         "timestamp_kst": now_kst().isoformat(),
         "checks": {},
@@ -721,7 +702,7 @@ def run_diagnostic(asof):
 def run_scheduled(asof):
     if valid_prior_run(asof):
         write_json(OUT / f"skip_status_{asof}_{now_kst().strftime('%H%M%S')}.json", {
-            "status": "SKIP — VALID CONTROLLED RUN ALREADY EXISTS",
+            "status": "SKIP — EXISTING SUCCESS RECORD PRESERVED",
             "asof_date": asof,
             "collector_revision": COLLECTOR_REVISION,
             "timestamp_kst": now_kst().isoformat(),
@@ -735,7 +716,7 @@ def run_scheduled(asof):
     if runner_started.time() < SAFE_CAPTURE_START:
         target = datetime.combine(runner_started.date(), SAFE_CAPTURE_START, tzinfo=TZ)
         wait_seconds = max(0.0, (target - runner_started).total_seconds())
-        if wait_seconds > 1800:
+        if wait_seconds > 3600:
             return fail_audit(asof, "EARLY_RUN_TOO_EARLY", {
                 "runner_started_kst": runner_started.isoformat(),
                 "planned_wait_seconds": round(wait_seconds, 3),
@@ -779,6 +760,13 @@ def run_scheduled(asof):
             "after_market_contamination": "UNVERIFIED",
         })
 
+    capture_contract=shared.check_v1_capture({
+        'asof_date':asof,'capture_started_kst':start.isoformat(),'capture_finished_kst':end_capture.isoformat(),
+        'current_day_trade_type':'KRX','after_market_contamination':False,
+        'same_day_generic_integrated_price_used':False,'trading_value_estimated_close_x_volume':False})
+    if capture_contract['status']!='PASS_CAPTURE_CONTRACT':
+        return fail_audit(asof,'V1_CAPTURE_CONTRACT_FAILED',capture_contract)
+
     # Merge frozen KRX investor flow without guessing missing fields.
     for c, fr in flow_map.items():
         if c in krx_current:
@@ -808,6 +796,7 @@ def run_scheduled(asof):
             "status": "SKIP — NON_TRADING_DAY_OR_STALE_SOURCE",
             "collector_revision": COLLECTOR_REVISION,
             "schema_version": SCHEMA_VERSION,
+            "shared_collector_version": shared.VERSION,
             "asof_date": asof,
             "capture_started_kst": start.isoformat(),
             "capture_finished_kst": end_capture.isoformat(),
@@ -854,7 +843,7 @@ def run_scheduled(asof):
     # Universe + sector can be enriched after the freeze because no same-day
     # price/volume/value from these sources is used.
     try:
-        universe = daum_market_universe("KOSPI") + daum_market_universe("KOSDAQ")
+        universe = shared.v1_universe_from_capture(krx_current)
         universe = list({x["ticker"]: x for x in universe}.values())
         sectors = {}
         sectors.update(daum_sector_map("KOSPI"))
@@ -883,6 +872,10 @@ def run_scheduled(asof):
             if done % 250 == 0:
                 print(f"history progress: {done}/{len(universe)}", flush=True)
 
+    write_json(OUT/f"history_source_audit_{asof}.json",{
+        'shared_collector_version':shared.VERSION,'tickers':HISTORY_SOURCE_AUDIT,
+        'actual_value_policy':'V1_EXISTING_WHOLE_SERIES_NO_CROSS_VENDOR_MERGE',
+        'no_close_times_volume':True,'venue_or_adjustment_certification':False})
     rows = []
     for item in universe:
         t = item["ticker"]
@@ -1086,6 +1079,7 @@ def run_scheduled(asof):
         "status": "PASS — CONTROLLED SNAPSHOT READY" if pass_all else "FAIL — DATA PIPELINE",
         "collector_revision": COLLECTOR_REVISION,
         "schema_version": SCHEMA_VERSION,
+        "shared_collector_version": shared.VERSION,
         "asof_date": asof,
         "data_cutoff_kst": "18:00",
         "capture_started_kst": start.isoformat(),
@@ -1137,11 +1131,13 @@ def run_scheduled(asof):
     manifest_targets = [
         OUT / f"regular_close_capture_{asof}.csv",
         universe_path, etf_path, bench_path, feat_path, etf_sum_path, audit_path,
+        OUT/f"history_source_audit_{asof}.json",
     ]
     manifest = {
         "asof_date": asof,
         "collector_revision": COLLECTOR_REVISION,
         "schema_version": SCHEMA_VERSION,
+        "shared_collector_version": shared.VERSION,
         "files": {
             p.name: {"sha256": sha256_file(p), "bytes": p.stat().st_size}
             for p in manifest_targets if p.exists()

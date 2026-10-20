@@ -1,0 +1,64 @@
+name: Shared Acquisition Validation
+on:
+  push:
+    branches: [main, codex/shared-collector-20261020]
+    paths:
+      - 'shared_market_data.py'
+      - 'shared_market_data_manifest.json'
+      - 'shared_collector_diagnostic.py'
+      - 'shared_run_manifest.py'
+      - 'test_shared_market_data.py'
+      - 'test_v1_shared_integration.py'
+      - 'frozen_v1_collection_contract.json'
+      - 'collector.py'
+      - 'naver_collector_v2.py'
+      - '.github/workflows/daily.yml'
+      - '.github/workflows/shared_collector_validation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'shared_market_data.py'
+      - 'collector.py'
+      - 'naver_collector_v2.py'
+      - '.github/workflows/shared_collector_validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shared-acquisition-and-version-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline regression and unchanged model boundaries
+        run: |
+          set -euo pipefail
+          mkdir -p shared_validation
+          python -m unittest discover -v 2>&1 | tee shared_validation/tests.log
+          if [[ -f collector.py ]]; then
+            python collector.py --self-test | tee shared_validation/v1_self_test.log
+          fi
+          if [[ -f tests/test_v2_daily_operations.py ]]; then
+            python -m unittest -v tests/test_v2_daily_operations.py 2>&1 | tee shared_validation/daily_operations_tests.log
+          fi
+      - name: Bounded live source and monetary-value parity (no official authorization)
+        if: github.event_name != 'pull_request'
+        run: python shared_collector_diagnostic.py --out-dir shared_validation/live
+      - name: Verify V1 model input compatibility using saved actual responses
+        if: github.event_name != 'pull_request'
+        run: |
+          git show de282f94e6439aefdcbcaeb245008ea39138fa2c:collector.py > "$RUNNER_TEMP/v1_pinned_baseline.py"
+          python verify_v1_history_compatibility.py --baseline "$RUNNER_TEMP/v1_pinned_baseline.py" --raw-dir shared_validation/live
+      - name: Preserve exact source response evidence by run and attempt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-acquisition-${{ github.run_id }}-${{ github.run_attempt }}
+          path: shared_validation/
+          if-no-files-found: error
+          retention-days: 90
