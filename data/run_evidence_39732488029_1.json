@@ -1,0 +1,11 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "39732488029",
+  "run_attempt": 1,
+  "code_sha": "5896e3a7f8ae6fb28edb4258cb620ec98e9d32ba",
+  "status": "NO_SOURCE_OUTPUT",
+  "files": [],
+  "official_prediction": false,
+  "orders_sent": 0
+}
