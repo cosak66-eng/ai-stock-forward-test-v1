@@ -20,6 +20,7 @@ on:
       - 'shared_market_data.py'
       - 'collector.py'
       - 'naver_collector_v2.py'
+      - '.github/workflows/daily.yml'
       - '.github/workflows/shared_collector_validation.yml'
   workflow_dispatch:
 permissions:
