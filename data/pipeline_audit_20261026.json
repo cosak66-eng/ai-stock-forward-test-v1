@@ -6,8 +6,8 @@
   "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
   "asof_date": "20261026",
   "data_cutoff_kst": "18:00",
-  "capture_started_kst": "2026-10-26T15:30:30.000194+09:00",
-  "capture_finished_kst": "2026-10-26T15:31:05.299004+09:00",
+  "capture_started_kst": "2026-10-26T15:37:45.942038+09:00",
+  "capture_finished_kst": "2026-10-26T15:38:29.026594+09:00",
   "safe_capture_window_kst": "15:30:30–15:39:30",
   "current_day_trade_type": "KRX",
   "after_market_contamination": false,
@@ -47,6 +47,6 @@
   "trading_value_estimated_close_x_volume": false,
   "same_day_generic_integrated_price_used": false,
   "etf_in_stock_ranking": false,
-  "collected_at_kst": "2026-10-26T15:37:32.609985+09:00",
+  "collected_at_kst": "2026-10-26T15:46:28.191738+09:00",
   "blocking_reason": "INSUFFICIENT NON-PRICE FACTOR COVERAGE"
 }

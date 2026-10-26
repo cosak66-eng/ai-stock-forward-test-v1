@@ -1,0 +1,62 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "40280797880",
+  "run_attempt": 1,
+  "code_sha": "8a8db52c5dca0b067dad685d1e9d742e67674f8d",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "benchmark_snapshot_20261026.csv",
+      "size_bytes": 348,
+      "sha256": "776bb96c911e37e4795dbd51dfeaed501c2c174487d505e2c4de190dd94ee2ac"
+    },
+    {
+      "path": "etf_regime_summary_20261026.json",
+      "size_bytes": 173,
+      "sha256": "9d295f47f4dc02d80e8e52540b0ab41a17bb06c5e6e897ef9ca3db3b94176ad2"
+    },
+    {
+      "path": "etf_snapshot_20261026.csv",
+      "size_bytes": 151197,
+      "sha256": "c5f1d9badcbe668acec7265a5b279cf3f4b9cee1e163887205f3fb9fea219bd3"
+    },
+    {
+      "path": "feature_coverage_20261026.json",
+      "size_bytes": 455,
+      "sha256": "20a889d236f407a01afe3467bd1458022de6236f1b740533077a794430e9c129"
+    },
+    {
+      "path": "history_source_audit_20261026.json",
+      "size_bytes": 1565080,
+      "sha256": "106cac4975c226b09b9efb46ee0efe902096085951e95c7c240b941633dda025"
+    },
+    {
+      "path": "latest_status.json",
+      "size_bytes": 1812,
+      "sha256": "98116f04c46aded27cba31bc29760800478f6745287163b033e8546d182ba438"
+    },
+    {
+      "path": "manifest_20261026.json",
+      "size_bytes": 1411,
+      "sha256": "cb969085d0aadffbfd980ec5ef1240da03d15e41cf35c77f88fd8fc4ccb3a671"
+    },
+    {
+      "path": "pipeline_audit_20261026.json",
+      "size_bytes": 1711,
+      "sha256": "8405ba72f181fac8a9733a747e57c45370392674eebedd7d1758867408a1e3b5"
+    },
+    {
+      "path": "regular_close_capture_20261026.csv",
+      "size_bytes": 515095,
+      "sha256": "10261681334433e3de23a0e4149a0ba1549d14d17517b3fba95960b88ae8d8a0"
+    },
+    {
+      "path": "universe_snapshot_20261026.csv",
+      "size_bytes": 1712534,
+      "sha256": "0fceaad7db1d1b62729769f67c09137ad932fcbc8557ffb04ca0c5b81bdd13ff"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
