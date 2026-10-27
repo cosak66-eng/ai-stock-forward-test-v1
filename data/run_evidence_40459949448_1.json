@@ -1,0 +1,62 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "40459949448",
+  "run_attempt": 1,
+  "code_sha": "2911d969044bc0b117c8d1b411eb816a685d5237",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "benchmark_snapshot_20261027.csv",
+      "size_bytes": 346,
+      "sha256": "35064bb70051168e6e9c5eeda14a2917678dc26fb2de73df34862b6bd3730c9c"
+    },
+    {
+      "path": "etf_regime_summary_20261027.json",
+      "size_bytes": 173,
+      "sha256": "6431c142f0ffde8020b4b9733370eb2278bb88cf6f38b9416778ee502c09e8ff"
+    },
+    {
+      "path": "etf_snapshot_20261027.csv",
+      "size_bytes": 150388,
+      "sha256": "84e29dcb22ef17b9c81f36792f74a8ef727d65546f0fe52cdf5d3747008f7d20"
+    },
+    {
+      "path": "feature_coverage_20261027.json",
+      "size_bytes": 455,
+      "sha256": "a4b31bee459da478a428662e1a7ad9794760ada3d4266b9835fb21dcb00e4eac"
+    },
+    {
+      "path": "history_source_audit_20261027.json",
+      "size_bytes": 1565080,
+      "sha256": "85caea57eff4e6ac43213f1152bd01320dc0f714329eb9e97dc9dee6d4e29a45"
+    },
+    {
+      "path": "latest_status.json",
+      "size_bytes": 1812,
+      "sha256": "8af75d21d77a7f8f716540a7d5c146ba850786030dd27b603c618b68132590d5"
+    },
+    {
+      "path": "manifest_20261027.json",
+      "size_bytes": 1411,
+      "sha256": "c3bca1c7e62e00475ec6a4692c86c337339150701f720ac3cf5922fcf7b0cf20"
+    },
+    {
+      "path": "pipeline_audit_20261027.json",
+      "size_bytes": 1711,
+      "sha256": "34b31224e97af019b2ddb29c573e32723e251a6875d1c17c7552b19b6b0596d7"
+    },
+    {
+      "path": "regular_close_capture_20261027.csv",
+      "size_bytes": 515314,
+      "sha256": "04483fafdcce3c5c2baec5c7c95561fdea404221bd2cd449a21ff039844c9eb1"
+    },
+    {
+      "path": "universe_snapshot_20261027.csv",
+      "size_bytes": 1712915,
+      "sha256": "a263e7c9b9172744dab5d5f3c7b6ccf2d4833d0ec44c97da94f4e9267dcb1498"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
