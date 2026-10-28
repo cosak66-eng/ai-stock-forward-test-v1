@@ -1113,7 +1113,7 @@ def run_scheduled(asof):
     current_close_cov = coverage(rows, lambda r: isinstance(r["reference_price"], (int, float)))
     max_errors = max(MAX_HISTORY_ERRORS_ABS, int(len(rows) * MAX_HISTORY_ERROR_RATIO))
 
-    after_market_contamination = False  # proven by capture timing + KRX-only source
+    after_market_contamination = False  # same-day values require DAUM/KRX close+volume agreement
     pass_all = (
         len(rows) >= MIN_SNAPSHOT_ROWS
         and duplicate == 0
@@ -1135,10 +1135,11 @@ def run_scheduled(asof):
         "schema_version": SCHEMA_VERSION,
         "shared_collector_version": shared.VERSION,
         "asof_date": asof,
-        "data_cutoff_kst": "18:00",
+        "data_cutoff_kst": "21:00",
+        "market_data_basis": "KRX_REGULAR_SESSION_ONLY",
         "capture_started_kst": start.isoformat(),
         "capture_finished_kst": end_capture.isoformat(),
-        "safe_capture_window_kst": "15:30:30–15:39:30",
+        "safe_capture_window_kst": "21:00:00–22:00:00",
         "current_day_trade_type": "KRX",
         "after_market_contamination": after_market_contamination,
         "snapshot_rows": len(rows),
@@ -1159,7 +1160,8 @@ def run_scheduled(asof):
         "benchmark_rows": len(benchmark_rows),
         "kospi_benchmark_history_rows": len(kospi_idx),
         "kosdaq_benchmark_history_rows": len(kosdaq_idx),
-        "investor_flow_capture_rows": len(flow_map),
+        "investor_flow_capture_rows": len(krx_current),
+        "same_day_regular_session_crosscheck_rows": len(krx_current),
         "feature_coverage": feature_cov,
         "active_feature_groups_at_70pct": active_features,
         "active_stock_specific_non_price_groups": non_price_stock_groups,
