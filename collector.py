@@ -53,7 +53,7 @@ OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2.6-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.7-CONTROLLED"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -94,13 +94,14 @@ def now_kst() -> datetime:
 
 
 def nnum(v):
-    if v is None or isinstance(v, (dict, list, tuple)):
+    if v is None or isinstance(v, (bool, dict, list, tuple)):
         return None
     s = str(v).replace(",", "").replace("%", "").strip()
     if s in {"", "-", "null", "None", "N/A", "DATA NOT AVAILABLE"}:
         return None
     try:
-        return float(s)
+        number = float(s)
+        return number if math.isfinite(number) else None
     except Exception:
         return None
 
@@ -191,25 +192,28 @@ def parse_current_record(d):
     c = code_from_dict(d)
     if not c:
         return None
+    # Never accept an explicitly after-hours row as a regular-close capture.
+    if d.get("tradingSessionType") in {"AFTER_MARKET", "BEFORE_MARKET"}:
+        return None
 
     return {
         "ticker": c,
         "company": str(scalar_first(d, "stockName", "itemName", "itemname", "name", "korName") or "").strip(),
         "market": str(scalar_first(d, "marketType", "market", "sosok", "marketName") or "").upper(),
-        "close": nnum(scalar_first(d, "closePrice", "tradePrice", "currentPrice", "nowVal", "price")),
+        "close": nnum(scalar_first(d, "closePrice", "tradePrice", "currentPrice", "nowVal", "nowPrice", "price")),
         "open": nnum(scalar_first(d, "openPrice", "openingPrice", "open")),
         "high": nnum(scalar_first(d, "highPrice", "high")),
         "low": nnum(scalar_first(d, "lowPrice", "low")),
         "volume": nnum(scalar_first(
             d, "accumulatedTradingVolume", "accTradeVolume", "tradingVolume",
-            "accQuant", "volume", "quant"
+            "accQuant", "tradeVolume", "volume", "quant"
         )),
         "trading_value": nnum(scalar_first(
             d, "accumulatedTradingValue", "accTradePrice", "tradingValue",
-            "accAmount", "amount", "tradingAmount"
+            "accAmount", "tradeAmount", "amount", "tradingAmount"
         )),
         "market_cap": nnum(scalar_first(d, "marketCap", "marketSum", "marketValue")),
-        "foreign_hold_ratio": nnum(scalar_first(d, "foreignHoldRatio", "foreignRate", "frgnRate")),
+        "foreign_hold_ratio": nnum(scalar_first(d, "foreignHoldRatio", "frgnHoldRate", "foreignRate", "frgnRate")),
         "foreign_net_buy": nnum(scalar_first(d, "foreignPureBuy", "foreignNetBuy", "foreignerNetBuy")),
         "institution_net_buy": nnum(scalar_first(d, "organizationPureBuy", "institutionNetBuy", "orgNetBuy")),
         "per": nnum(scalar_first(d, "per", "PER")),
@@ -238,6 +242,8 @@ def naver_krx_regular_snapshot(max_pages=80):
         })
         url = "https://stock.naver.com/api/domestic/market/stock/default?" + q
         obj = http_json(url, NAVER_HEADERS)
+        if page == 0:
+            write_json(OUT / "naver_krx_market_response.json", {"request_url": url, "payload": obj})
         recs = {}
         for d in record_dicts(obj):
             r = parse_current_record(d)
@@ -277,6 +283,8 @@ def naver_investor_flow_map(asof):
         })
         url = "https://stock.naver.com/api/domestic/market/trend/daily?" + q
         obj = http_json(url, NAVER_HEADERS)
+        if page == 0:
+            write_json(OUT / "naver_flow_response.json", {"request_url": url, "payload": obj})
         recs = {}
         for d in record_dicts(obj):
             c = code_from_dict(d)
@@ -1117,7 +1125,9 @@ def run_scheduled(asof):
         "collected_at_kst": now_kst().isoformat(),
     }
 
-    if not non_price_group_ok:
+    if current_close_cov == 0:
+        audit["blocking_reason"] = "CURRENT_KRX_PRICE_FIELDS_UNAVAILABLE"
+    elif not non_price_group_ok:
         audit["blocking_reason"] = "INSUFFICIENT NON-PRICE FACTOR COVERAGE"
     elif not benchmark_gate:
         audit["blocking_reason"] = "BENCHMARK DATA INCOMPLETE"

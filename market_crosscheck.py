@@ -71,7 +71,7 @@ def naver_rows(date,max_pages=45):
         o=get_json('https://stock.naver.com/api/domestic/market/stock/default?'+q,'https://stock.naver.com/')
         new=0; seen=0
         for d in walk(o):
-            ticker=code(pick(d,'itemCode','stockCode','code','symbolCode','ticker'))
+            ticker=code(pick(d,'itemCode','itemcode','stockCode','code','symbolCode','ticker'))
             if not ticker:continue
             seen+=1;metadata['raw_records']+=1
             if not metadata['sample_keys']:metadata['sample_keys']=list(d.keys())[:35]
@@ -80,13 +80,52 @@ def naver_rows(date,max_pages=45):
             if ds!=date:
                 metadata['undated_rows']+=1
                 continue
-            row=make_row(ticker,date,'NAVER',pick(d,'closePrice','close','tradePrice','currentPrice'),pick(d,'accTradeVolume','tradeVolume','volume'),pick(d,'accTradePrice','tradeAmount','tradingValue','tradingAmount'))
+            row=make_row(ticker,date,'NAVER',pick(d,'closePrice','close','tradePrice','currentPrice','nowPrice'),pick(d,'accTradeVolume','tradeVolume','volume'),pick(d,'accTradePrice','tradeAmount','tradingValue','tradingAmount'))
             if row:
                 if ticker not in rows:new+=1
                 rows[ticker]=row
         metadata['pages']+=1
         if seen==0 or (page>0 and new==0):break
     return rows,metadata
+
+
+def naver_dated_samples(date, evidence_dir=None, sample=SAMPLE):
+    """Bounded official-page daily response; never date-stamp an undated quote.
+
+    closingPrice/volume/value are kept from the SAME daily response. Do not
+    combine regularMarketClosingPrice with post-close volume/value. This
+    diagnostic remains unverified for regular-session/cutoff purposes.
+    """
+    rows = {}
+    metadata = {'route': 'NAVER_ITEMS_V2_DAILY_PRICES', 'requests': 0,
+                'undated_rows': 0, 'errors': {}, 'regular_session_proven': False}
+    for ticker in sample:
+        if code(ticker) != ticker:
+            raise ValueError('Invalid diagnostic ticker')
+        url = ('https://stock.naver.com/api/stockSecurity/items/v2/domestic/'
+               + ticker + '/daily-prices/paged?size=5&index=0')
+        try:
+            payload = get_json(url, 'https://stock.naver.com/domestic/stock/' + ticker + '/price')
+            metadata['requests'] += 1
+            if evidence_dir is not None:
+                root = Path(evidence_dir); root.mkdir(parents=True, exist_ok=True)
+                (root / (ticker + '_naver_daily.json')).write_text(
+                    json.dumps({'request_url': url, 'payload': payload}, ensure_ascii=False, indent=2), encoding='utf-8')
+            if not isinstance(payload, dict) or not isinstance(payload.get('items'), list):
+                raise ValueError('Unexpected NAVER daily schema')
+            for raw in payload['items']:
+                day = str(raw.get('tradingDateKst') or '').replace('-', '')
+                if day != date:
+                    metadata['undated_rows'] += 1
+                    continue
+                row = make_row(ticker, day, 'NAVER', raw.get('closingPrice'),
+                               raw.get('tradingVolume'), raw.get('tradingValue'))
+                if row:
+                    rows[ticker] = row
+                break
+        except Exception as exc:
+            metadata['errors'][ticker] = type(exc).__name__ + ':' + str(exc)[:250]
+    return rows, metadata
 
 
 def compare_primary(n,d):
@@ -124,7 +163,7 @@ def main(argv=None):
     out=Path(a.output);out.mkdir(parents=True,exist_ok=True)
     report={'date':date,'diagnostic_only':True,'prediction_eligible':False,'regular_session_proven':False,'cutoff_18_kst_proven':False,'primary':{},'optional':{},'comparisons':{},'warnings':[],'errors':[]}
     try:
-        naver,meta=naver_rows(date)
+        naver,meta=naver_dated_samples(date, evidence_dir=out / "raw")
         report['primary']['naver']={'rows':len(naver),'metadata':meta}
     except Exception as e:
         naver={};report['primary']['naver']={'rows':0,'error':type(e).__name__+':'+str(e)[:250]};report['errors'].append('NAVER_FETCH_FAILED')
