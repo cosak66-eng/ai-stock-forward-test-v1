@@ -25,7 +25,7 @@ class V1IntegrationTests(unittest.TestCase):
    self.assertEqual(json.loads((Path(tmp)/'latest_status.json').read_text())['error'],'UNSAFE_CAPTURE_TIME')
  def test_early_runner_waits_for_2100_kst_window(self):
   early=datetime.fromisoformat('2026-10-20T20:58:00+09:00');safe=datetime.fromisoformat('2026-10-20T21:00:00+09:00')
-  with tempfile.TemporaryDirectory() as tmp,patch.object(c,'OUT',Path(tmp)),patch.object(c,'valid_prior_run',return_value=False),patch.object(c,'now_kst',side_effect=[early,safe]),patch.object(c.time,'sleep') as wait,patch.object(c,'index_history',side_effect=RuntimeError('fixture stops source access')) as fetch:
+  with tempfile.TemporaryDirectory() as tmp,patch.object(c,'OUT',Path(tmp)),patch.object(c,'valid_prior_run',return_value=False),patch.object(c,'now_kst',side_effect=[early,safe,safe]),patch.object(c.time,'sleep') as wait,patch.object(c,'index_history',side_effect=RuntimeError('fixture stops source access')) as fetch:
    self.assertNotEqual(c.run_scheduled('20261020'),0);wait.assert_called_once_with(120.0);fetch.assert_called_once()
  def test_prior_success_is_preserved_across_collector_revisions(self):
   with tempfile.TemporaryDirectory() as tmp,patch.object(c,'DATA',Path(tmp)):
