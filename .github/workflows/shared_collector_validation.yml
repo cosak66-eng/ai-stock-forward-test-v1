@@ -11,6 +11,10 @@ on:
       - 'test_v1_shared_integration.py'
       - 'frozen_v1_collection_contract.json'
       - 'collector.py'
+      - 'market_crosscheck.py'
+      - 'v1_response_diagnostic.py'
+      - 'test_v1_response_adapter.py'
+      - 'fixtures/**'
       - 'naver_collector_v2.py'
       - '.github/workflows/daily.yml'
       - '.github/workflows/shared_collector_validation.yml'
@@ -19,6 +23,10 @@ on:
     paths:
       - 'shared_market_data.py'
       - 'collector.py'
+      - 'market_crosscheck.py'
+      - 'v1_response_diagnostic.py'
+      - 'test_v1_response_adapter.py'
+      - 'fixtures/**'
       - 'naver_collector_v2.py'
       - '.github/workflows/daily.yml'
       - '.github/workflows/shared_collector_validation.yml'
@@ -47,6 +55,8 @@ jobs:
           if [[ -f tests/test_v2_daily_operations.py ]]; then
             python -m unittest -v tests/test_v2_daily_operations.py 2>&1 | tee shared_validation/daily_operations_tests.log
           fi
+      - name: Bounded V1 response schema diagnostic (no prediction writes)
+        run: python v1_response_diagnostic.py --out-dir shared_validation/v1_response
       - name: Bounded live source and monetary-value parity (no official authorization)
         if: github.event_name != 'pull_request'
         run: python shared_collector_diagnostic.py --out-dir shared_validation/live
