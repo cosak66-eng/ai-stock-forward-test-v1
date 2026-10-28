@@ -1,0 +1,47 @@
+name: V1 Shared Evening Research Collection
+on:
+  schedule:
+    # UTC 12:00 = Korea 21:00 = Ulaanbaatar 20:00.
+    - cron: '0 12 * * 1-5'
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths: ['shared_history_archive.py', 'test_shared_history_archive.py', '.github/workflows/shared_evening_collection.yml']
+permissions:
+  contents: read
+concurrency:
+  group: v1-evening-research-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Archive regression and frozen V1 boundaries
+        run: python -m unittest -v test_shared_history_archive.py test_v1_shared_integration.py
+  collect:
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Evening research source archive only
+        run: |
+          DAY="$(TZ=Asia/Seoul date +%F)"
+          python shared_history_archive.py --start-date "$DAY" --end-date "$DAY" \
+            --full-universe --confirm-full-market --workers 4 --out-dir evening_research_archive
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v1-evening-research-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evening_research_archive/
+          if-no-files-found: error
+          retention-days: 90
