@@ -11,11 +11,11 @@ Prospective paper-trading data collection only. No real orders.
 Hard integrity principles
 -------------------------
 1) Prediction-date reference data must be KRX regular-session specific.
-2) A scheduled run may be accepted only when the current-day KRX snapshot is
-   frozen after regular close (15:30 KST) and before after-hours executions
-   begin changing post-close volume/value fields (15:40 KST).
+2) A scheduled run is collected at the user-approved 21:00 KST schedule
+   (operational window 21:00–22:00 KST). Same-day model inputs are accepted
+   only when an explicit KRX regular-session record matches the native daily bar.
 3) Historical website-facing bars are filtered to date < as-of; the current
-   day is merged only from the frozen KRX-specific capture.
+   day is merged only from the cross-validated KRX regular-session record.
 4) No missing-value imputation. No close*volume trading-value estimation.
 5) ETF/ETN/management/halt exclusions are hard-gated.
 6) At least one stock-specific NON-PRICE group (Flow OR Fundamental/Quality OR
@@ -534,7 +534,7 @@ def etn_codes(max_pages=30):
 
 
 def etf_snapshot(asof):
-    """Current Naver ETF v2 list, captured inside the safe regular-close window."""
+    """Current Naver ETF v2 list for context/exclusion; not a same-day stock-price input."""
     rows = []
     seen = set()
     for page in range(0, 30):
