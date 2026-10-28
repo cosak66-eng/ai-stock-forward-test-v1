@@ -9,11 +9,8 @@ on:
         default: "diagnostic"
 
   schedule:
-    # Start the runner earlier; the frozen capture window is unchanged.
-    # UTC 05:45 = 14:45 KST; 06:05/20 are redundant wake-ups.
-    # This mitigates observed 31-37 minute queue delays without accepting late data.
-    - cron: "45 5 * * 1-5"
-    - cron: "5,20 6 * * 1-5"
+    # UTC 12:00 = Korea 21:00. Same-day model inputs are KRX regular-session only.
+    - cron: "0 12 * * 1-5"
 
 permissions:
   contents: write
