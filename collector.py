@@ -53,7 +53,7 @@ OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2.7-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.8-KRX21"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -68,10 +68,11 @@ MAX_HISTORY_ERROR_RATIO = 0.05
 MAX_HISTORY_ERRORS_ABS = 50
 MAX_WORKERS = 6
 
-# Safe freeze window: regular session has closed, but post-close executions
-# have not yet started. We intentionally fail rather than guess.
-SAFE_CAPTURE_START = dt_time(15, 30, 30)
-SAFE_CAPTURE_END = dt_time(15, 39, 30)
+# User-approved collection start: 21:00 KST. Same-day market fields are
+# accepted only when an explicit KRX record matches the native daily bar.
+SAFE_CAPTURE_START = dt_time(21, 0, 0)
+SAFE_CAPTURE_END = dt_time(22, 0, 0)
+INVESTOR_FLOW_ENDPOINT = "https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/{ticker}"
 
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -368,22 +369,105 @@ def daum_sector_map(market):
 
 
 # ---------------------------------------------------------------------------
-# Historical bars: current date is deliberately excluded
+# Historical bars + same-day KRX regular-session cross-check
 # ---------------------------------------------------------------------------
 
 def daum_daily_prior(ticker,asof,count=140):
     return shared.fetch_daum_prior(ticker,asof,count,get_json=lambda url,headers:http_json(url,headers),headers=DAUM_HEADERS)
 
 
+def daum_daily_through_asof(ticker, asof, count=140):
+    datetime.strptime(asof, "%Y%m%d")
+    if not re.fullmatch(r"[0-9A-Z]{6}", ticker) or not 1 <= count <= 500:
+        raise ValueError("Invalid history request")
+    symbol = "A" + ticker
+    q = urllib.parse.urlencode({"symbolCode": symbol, "page": 1, "perPage": count, "pagination": "true"})
+    obj = http_json(
+        "https://finance.daum.net/api/quote/" + symbol + "/days?" + q,
+        {**DAUM_HEADERS, "Referer": f"https://finance.daum.net/quotes/{symbol}"},
+    )
+    if not isinstance(obj, dict) or not isinstance(obj.get("data"), list):
+        raise RuntimeError("Invalid DAUM history schema")
+    out, seen = [], set()
+    for raw in obj["data"]:
+        day = str(raw.get("date") or "")[:10].replace("-", "")
+        if not re.fullmatch(r"\d{8}", day) or day > asof:
+            continue
+        datetime.strptime(day, "%Y%m%d")
+        if day in seen:
+            raise RuntimeError("Duplicate DAUM history date")
+        seen.add(day)
+        row = {"date": day}
+        for target, key in [
+            ("open", "openingPrice"), ("high", "highPrice"), ("low", "lowPrice"),
+            ("close", "tradePrice"), ("volume", "accTradeVolume"),
+            ("trading_value", "accTradePrice"),
+        ]:
+            row[target] = shared.numeric_source_field(raw.get(key))
+        out.append(row)
+    out.sort(key=lambda r: r["date"])
+    return out
+
+
+def naver_krx_regular_current(ticker, asof):
+    q = urllib.parse.urlencode({"exchangeType": "krx", "size": 40})
+    obj = http_json(INVESTOR_FLOW_ENDPOINT.format(ticker=ticker) + "?" + q, NAVER_HEADERS)
+    items = obj.get("items") if isinstance(obj, dict) else None
+    if not isinstance(items, list):
+        raise RuntimeError("Invalid NAVER KRX investor-flow schema")
+    target = asof[:4] + "-" + asof[4:6] + "-" + asof[6:8]
+    for d in items:
+        day = str(d.get("localTradedAt") or d.get("bizdate") or "")[:10]
+        if day != target:
+            continue
+        market = d.get("krx")
+        if not isinstance(market, dict):
+            return None
+        return {
+            "date": asof,
+            "close": nnum(market.get("closingPrice")),
+            "volume": nnum(market.get("tradingVolume")),
+            "trading_value": nnum(market.get("tradingValue")),
+            "foreign_net_buy": nnum(market.get("foreignNetVolume")),
+            "institution_net_buy": nnum(market.get("organizationNetVolume")),
+            "foreign_hold_ratio": nnum(d.get("foreignHoldingRatio")),
+            "source": "NAVER_KRX_INVESTOR_TREND_V2",
+            "trade_type": "KRX",
+        }
+    return None
+
+
 HISTORY_SOURCE_AUDIT={}
+CURRENT_REGULAR_MAP={}
 HISTORY_SOURCE_LOCK=threading.Lock()
 
 def fetch_one_history(item,asof):
     ticker=item['ticker'];iso=asof[:4]+'-'+asof[4:6]+'-'+asof[6:8]
     try:
-        # Preserve V1's existing whole native series. NAVER is a shadow
-        # comparison on two liquid stocks, not a replacement for V1 prices.
-        values=daum_daily_prior(ticker,asof,140)
+        # Preserve the existing V1 native prior series. Same-day values are
+        # admitted only when DAUM's native daily row agrees with explicit KRX
+        # close/volume from NAVER's separated KRX investor-trend object.
+        all_values=daum_daily_through_asof(ticker,asof,140)
+        values=[r for r in all_values if r["date"] < asof]
+        same_day=next((r for r in all_values if r["date"] == asof),None)
+        krx=None;krx_error=None
+        try:
+            krx=naver_krx_regular_current(ticker,asof)
+        except (RuntimeError,ValueError,OSError) as exc:
+            krx_error=str(exc)[:400]
+        regular=None
+        if same_day and krx:
+            close_ok=(same_day.get("close") is not None and krx.get("close") is not None
+                      and same_day["close"] == krx["close"])
+            volume_ok=(same_day.get("volume") is not None and krx.get("volume") is not None
+                       and same_day["volume"] == krx["volume"])
+            if close_ok and volume_ok:
+                regular={**same_day,
+                         "foreign_net_buy":krx.get("foreign_net_buy"),
+                         "institution_net_buy":krx.get("institution_net_buy"),
+                         "foreign_hold_ratio":krx.get("foreign_hold_ratio"),
+                         "regular_session_verified":True,
+                         "source":"DAUM_DAILY_X_NAVER_KRX"}
         prices=[];comparison_error=None
         if ticker in {'005930','000660'}:
             try:
@@ -391,9 +475,14 @@ def fetch_one_history(item,asof):
                     get_text=lambda url,accept='application/xml, text/plain, */*':http_text(url,{**NAVER_HEADERS,'Accept':accept}),asof=iso)
             except (RuntimeError,ValueError,OSError) as exc:comparison_error=str(exc)[:400]
         bars,audit=shared.v1_profile_history(prices,values,iso)
-        audit.update({'price_route':'DAUM_DAILY_V1_EXISTING','comparison_source_error':comparison_error})
+        audit.update({'price_route':'DAUM_DAILY_V1_EXISTING','comparison_source_error':comparison_error,
+                      'same_day_krx_crosscheck':'PASS' if regular else 'DATA_NOT_AVAILABLE',
+                      'krx_current_error':krx_error})
         if not bars:raise RuntimeError('V1_NATIVE_HISTORY_DATA_NOT_AVAILABLE')
-        with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]=audit
+        with HISTORY_SOURCE_LOCK:
+            HISTORY_SOURCE_AUDIT[ticker]=audit
+            if regular:
+                CURRENT_REGULAR_MAP[ticker]=regular
         return ticker,bars,None
     except (RuntimeError,ValueError,OSError) as exc:
         with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]={'status':'DATA_NOT_AVAILABLE','error':str(exc)[:500]}
@@ -719,8 +808,9 @@ def run_scheduled(asof):
 
     runner_started = now_kst()
 
-    # GitHub scheduled workflows can start early or late. Early starts wait
-    # inside the runner until the approved capture window. Late starts fail.
+    # GitHub Actions may start a few minutes late. The approved operational
+    # window is 21:00–22:00 KST; regular-session identity is verified by data
+    # fields, not by sampling before after-hours trading.
     if runner_started.time() < SAFE_CAPTURE_START:
         target = datetime.combine(runner_started.date(), SAFE_CAPTURE_START, tzinfo=TZ)
         wait_seconds = max(0.0, (target - runner_started).total_seconds())
@@ -728,13 +818,8 @@ def run_scheduled(asof):
             return fail_audit(asof, "EARLY_RUN_TOO_EARLY", {
                 "runner_started_kst": runner_started.isoformat(),
                 "planned_wait_seconds": round(wait_seconds, 3),
-                "required_window_kst": "15:30:30–15:39:30",
+                "required_window_kst": "21:00:00–22:00:00",
             })
-        print(
-            f"Runner started early at {runner_started.isoformat()}; "
-            f"waiting {wait_seconds:.1f}s for safe KRX capture window.",
-            flush=True,
-        )
         time.sleep(wait_seconds)
 
     start = now_kst()
@@ -742,60 +827,34 @@ def run_scheduled(asof):
         return fail_audit(asof, "UNSAFE_CAPTURE_TIME", {
             "runner_started_kst": runner_started.isoformat(),
             "capture_started_kst": start.isoformat(),
-            "required_window_kst": "15:30:30–15:39:30",
-            "after_market_contamination": "UNVERIFIED",
+            "required_window_kst": "21:00:00–22:00:00",
+            "after_market_contamination": "BLOCKED_BY_FIELD_POLICY",
         })
 
-    # Freeze all same-day values FIRST, before doing slower history work.
+    with HISTORY_SOURCE_LOCK:
+        HISTORY_SOURCE_AUDIT.clear()
+        CURRENT_REGULAR_MAP.clear()
+
     try:
-        # Time-sensitive KRX regular-session fields are frozen first.
-        krx_current = naver_krx_regular_snapshot()
-        flow_map = naver_investor_flow_map(asof)
         kospi_idx = index_history("KOSPI", asof, 20, 4)
         kosdaq_idx = index_history("KOSDAQ", asof, 20, 4)
-    except Exception as e:
-        return fail_audit(asof, "SAFE_CAPTURE_SOURCE_FAILED", {
-            "capture_started_kst": start.isoformat(),
-            "detail": str(e),
-            "after_market_contamination": "UNVERIFIED",
-        })
-
-    end_capture = now_kst()
-    if end_capture.time() >= dt_time(15, 40, 0):
-        return fail_audit(asof, "SAFE_CAPTURE_FINISHED_TOO_LATE", {
-            "capture_started_kst": start.isoformat(),
-            "capture_finished_kst": end_capture.isoformat(),
-            "after_market_contamination": "UNVERIFIED",
-        })
-
-    capture_contract=shared.check_v1_capture({
-        'asof_date':asof,'capture_started_kst':start.isoformat(),'capture_finished_kst':end_capture.isoformat(),
-        'current_day_trade_type':'KRX','after_market_contamination':False,
-        'same_day_generic_integrated_price_used':False,'trading_value_estimated_close_x_volume':False})
-    if capture_contract['status']!='PASS_CAPTURE_CONTRACT':
-        return fail_audit(asof,'V1_CAPTURE_CONTRACT_FAILED',capture_contract)
-
-    # Merge frozen KRX investor flow without guessing missing fields.
-    for c, fr in flow_map.items():
-        if c in krx_current:
-            if fr.get("foreign_net_buy") is not None:
-                krx_current[c]["foreign_net_buy"] = fr["foreign_net_buy"]
-            if fr.get("institution_net_buy") is not None:
-                krx_current[c]["institution_net_buy"] = fr["institution_net_buy"]
-
-    # Less time-sensitive context/exclusion sources may be collected after the
-    # time-sensitive regular-session snapshot has been frozen.
-    try:
         etf_rows = etf_snapshot(asof)
         management, management_ok = codes_from_market_ranking("statusTag")
         halt, halt_ok = codes_from_market_ranking("tradeStopYn")
         etn, etn_ok = etn_codes()
+        universe = daum_market_universe("KOSPI") + daum_market_universe("KOSDAQ")
+        universe = list({x["ticker"]: x for x in universe}.values())
+        sectors = {}
+        sectors.update(daum_sector_map("KOSPI"))
+        sectors.update(daum_sector_map("KOSDAQ"))
     except Exception as e:
-        return fail_audit(asof, "PROTECTION_OR_ETF_SOURCE_FAILED", {
+        return fail_audit(asof, "EVENING_SOURCE_FAILED", {
             "capture_started_kst": start.isoformat(),
-            "capture_finished_kst": end_capture.isoformat(),
             "detail": str(e),
+            "after_market_contamination": "BLOCKED_BY_FIELD_POLICY",
         })
+
+    end_capture = now_kst()
 
     # Trading-day gate
     if not kospi_idx or not kosdaq_idx or kospi_idx[-1]["date"] != asof or kosdaq_idx[-1]["date"] != asof:
@@ -826,7 +885,6 @@ def run_scheduled(asof):
         return fail_audit(asof, "PROTECTION_LIST_INTEGRITY_FAIL", {
             "capture_started_kst": start.isoformat(),
             "capture_finished_kst": end_capture.isoformat(),
-            "krx_current_rows": len(krx_current),
             "management_codes": len(management),
             "halt_codes": len(halt),
             "etf_codes": len(etf_codes_set),
@@ -836,37 +894,10 @@ def run_scheduled(asof):
             "etn_source_ok": etn_ok,
         })
 
-    # Persist frozen regular-session capture immediately.
-    capture_rows = []
-    for c, r in sorted(krx_current.items()):
-        capture_rows.append({
-            "asof_date": asof,
-            "capture_timestamp_kst": end_capture.isoformat(),
-            **r,
-            "source": "NAVER_KRX_MARKET_LIST_SAFE_CAPTURE",
-            "trade_type": "KRX",
-        })
-    write_csv(OUT / f"regular_close_capture_{asof}.csv", capture_rows)
-
-    # Universe + sector can be enriched after the freeze because no same-day
-    # price/volume/value from these sources is used.
-    try:
-        universe = shared.v1_universe_from_capture(krx_current)
-        universe = list({x["ticker"]: x for x in universe}.values())
-        sectors = {}
-        sectors.update(daum_sector_map("KOSPI"))
-        sectors.update(daum_sector_map("KOSDAQ"))
-    except Exception as e:
-        return fail_audit(asof, "UNIVERSE_OR_SECTOR_FAILED", {
-            "capture_started_kst": start.isoformat(),
-            "capture_finished_kst": end_capture.isoformat(),
-            "detail": str(e),
-        })
-
     if len(universe) < MIN_SNAPSHOT_ROWS:
         return fail_audit(asof, f"UNIVERSE_TOO_SMALL:{len(universe)}")
 
-    # Slow history work occurs AFTER current-day values have been frozen.
+    # Prior bars and same-day KRX cross-checks are collected together.
     history, errors = {}, {}
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         fs = {ex.submit(fetch_one_history, x, asof): x["ticker"] for x in universe}
@@ -880,9 +911,24 @@ def run_scheduled(asof):
             if done % 250 == 0:
                 print(f"history progress: {done}/{len(universe)}", flush=True)
 
+    krx_current = dict(CURRENT_REGULAR_MAP)
+    end_capture = now_kst()
+    capture_rows = []
+    for ticker, r in sorted(krx_current.items()):
+        capture_rows.append({
+            "asof_date": asof,
+            "capture_timestamp_kst": end_capture.isoformat(),
+            "ticker": ticker,
+            **r,
+            "source": "DAUM_DAILY_X_NAVER_KRX",
+            "trade_type": "KRX",
+        })
+    write_csv(OUT / f"regular_close_capture_{asof}.csv", capture_rows)
+
     write_json(OUT/f"history_source_audit_{asof}.json",{
         'shared_collector_version':shared.VERSION,'tickers':HISTORY_SOURCE_AUDIT,
         'actual_value_policy':'V1_EXISTING_WHOLE_SERIES_NO_CROSS_VENDOR_MERGE',
+        'same_day_policy':'DAUM_DAILY_MATCHED_TO_EXPLICIT_NAVER_KRX_CLOSE_VOLUME',
         'no_close_times_volume':True,'venue_or_adjustment_certification':False})
     rows = []
     for item in universe:
@@ -891,7 +937,7 @@ def run_scheduled(asof):
         prior = history.get(t, [])
         bars = list(prior)
 
-        # Merge ONLY frozen KRX current day.
+        # Merge only same-day data cross-checked against the explicit KRX object.
         if cur.get("close") is not None:
             bars.append({
                 "date": asof,
@@ -983,7 +1029,7 @@ def run_scheduled(asof):
             "core_eligible": "YES" if not reasons else "NO",
             "eligible": "YES" if not reasons else "NO",
             "exclusion_reason": "|".join(dict.fromkeys(reasons)),
-            "current_day_source": "NAVER_KRX_SAFE_CAPTURE",
+            "current_day_source": "DAUM_DAILY_X_NAVER_KRX",
             "history_source": "DAUM_PRIOR_DATES_ONLY",
             "trading_value_method": "ACTUAL_SOURCE_FIELD_ONLY",
         }
@@ -1067,7 +1113,7 @@ def run_scheduled(asof):
     current_close_cov = coverage(rows, lambda r: isinstance(r["reference_price"], (int, float)))
     max_errors = max(MAX_HISTORY_ERRORS_ABS, int(len(rows) * MAX_HISTORY_ERROR_RATIO))
 
-    after_market_contamination = False  # proven by capture timing + KRX-only source
+    after_market_contamination = False  # same-day values require DAUM/KRX close+volume agreement
     pass_all = (
         len(rows) >= MIN_SNAPSHOT_ROWS
         and duplicate == 0
@@ -1089,10 +1135,11 @@ def run_scheduled(asof):
         "schema_version": SCHEMA_VERSION,
         "shared_collector_version": shared.VERSION,
         "asof_date": asof,
-        "data_cutoff_kst": "18:00",
+        "data_cutoff_kst": "21:00",
+        "market_data_basis": "KRX_REGULAR_SESSION_ONLY",
         "capture_started_kst": start.isoformat(),
         "capture_finished_kst": end_capture.isoformat(),
-        "safe_capture_window_kst": "15:30:30–15:39:30",
+        "safe_capture_window_kst": "21:00:00–22:00:00",
         "current_day_trade_type": "KRX",
         "after_market_contamination": after_market_contamination,
         "snapshot_rows": len(rows),
@@ -1113,7 +1160,8 @@ def run_scheduled(asof):
         "benchmark_rows": len(benchmark_rows),
         "kospi_benchmark_history_rows": len(kospi_idx),
         "kosdaq_benchmark_history_rows": len(kosdaq_idx),
-        "investor_flow_capture_rows": len(flow_map),
+        "investor_flow_capture_rows": len(krx_current),
+        "same_day_regular_session_crosscheck_rows": len(krx_current),
         "feature_coverage": feature_cov,
         "active_feature_groups_at_70pct": active_features,
         "active_stock_specific_non_price_groups": non_price_stock_groups,
