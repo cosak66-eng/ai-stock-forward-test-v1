@@ -53,7 +53,7 @@ OUT = Path("output")
 DATA = Path("data")
 OUT.mkdir(parents=True, exist_ok=True)
 
-COLLECTOR_REVISION = "FREEWEB-1.2.7-CONTROLLED"
+COLLECTOR_REVISION = "FREEWEB-1.2.8-KRX21"
 SCHEMA_VERSION = "V10-DATA-1.2"
 
 # Frozen V1.0 screening thresholds
@@ -68,10 +68,11 @@ MAX_HISTORY_ERROR_RATIO = 0.05
 MAX_HISTORY_ERRORS_ABS = 50
 MAX_WORKERS = 6
 
-# Safe freeze window: regular session has closed, but post-close executions
-# have not yet started. We intentionally fail rather than guess.
-SAFE_CAPTURE_START = dt_time(15, 30, 30)
-SAFE_CAPTURE_END = dt_time(15, 39, 30)
+# User-approved collection start: 21:00 KST. Same-day market fields are
+# accepted only when an explicit KRX record matches the native daily bar.
+SAFE_CAPTURE_START = dt_time(21, 0, 0)
+SAFE_CAPTURE_END = dt_time(22, 0, 0)
+INVESTOR_FLOW_ENDPOINT = "https://stock.naver.com/api/stockSecurity/investor-trend/v2/domestic/{ticker}"
 
 UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -368,22 +369,105 @@ def daum_sector_map(market):
 
 
 # ---------------------------------------------------------------------------
-# Historical bars: current date is deliberately excluded
+# Historical bars + same-day KRX regular-session cross-check
 # ---------------------------------------------------------------------------
 
 def daum_daily_prior(ticker,asof,count=140):
     return shared.fetch_daum_prior(ticker,asof,count,get_json=lambda url,headers:http_json(url,headers),headers=DAUM_HEADERS)
 
 
+def daum_daily_through_asof(ticker, asof, count=140):
+    datetime.strptime(asof, "%Y%m%d")
+    if not re.fullmatch(r"[0-9A-Z]{6}", ticker) or not 1 <= count <= 500:
+        raise ValueError("Invalid history request")
+    symbol = "A" + ticker
+    q = urllib.parse.urlencode({"symbolCode": symbol, "page": 1, "perPage": count, "pagination": "true"})
+    obj = http_json(
+        "https://finance.daum.net/api/quote/" + symbol + "/days?" + q,
+        {**DAUM_HEADERS, "Referer": f"https://finance.daum.net/quotes/{symbol}"},
+    )
+    if not isinstance(obj, dict) or not isinstance(obj.get("data"), list):
+        raise RuntimeError("Invalid DAUM history schema")
+    out, seen = [], set()
+    for raw in obj["data"]:
+        day = str(raw.get("date") or "")[:10].replace("-", "")
+        if not re.fullmatch(r"\d{8}", day) or day > asof:
+            continue
+        datetime.strptime(day, "%Y%m%d")
+        if day in seen:
+            raise RuntimeError("Duplicate DAUM history date")
+        seen.add(day)
+        row = {"date": day}
+        for target, key in [
+            ("open", "openingPrice"), ("high", "highPrice"), ("low", "lowPrice"),
+            ("close", "tradePrice"), ("volume", "accTradeVolume"),
+            ("trading_value", "accTradePrice"),
+        ]:
+            row[target] = shared.numeric_source_field(raw.get(key))
+        out.append(row)
+    out.sort(key=lambda r: r["date"])
+    return out
+
+
+def naver_krx_regular_current(ticker, asof):
+    q = urllib.parse.urlencode({"exchangeType": "krx", "size": 40})
+    obj = http_json(INVESTOR_FLOW_ENDPOINT.format(ticker=ticker) + "?" + q, NAVER_HEADERS)
+    items = obj.get("items") if isinstance(obj, dict) else None
+    if not isinstance(items, list):
+        raise RuntimeError("Invalid NAVER KRX investor-flow schema")
+    target = asof[:4] + "-" + asof[4:6] + "-" + asof[6:8]
+    for d in items:
+        day = str(d.get("localTradedAt") or d.get("bizdate") or "")[:10]
+        if day != target:
+            continue
+        market = d.get("krx")
+        if not isinstance(market, dict):
+            return None
+        return {
+            "date": asof,
+            "close": nnum(market.get("closingPrice")),
+            "volume": nnum(market.get("tradingVolume")),
+            "trading_value": nnum(market.get("tradingValue")),
+            "foreign_net_buy": nnum(market.get("foreignNetVolume")),
+            "institution_net_buy": nnum(market.get("organizationNetVolume")),
+            "foreign_hold_ratio": nnum(d.get("foreignHoldingRatio")),
+            "source": "NAVER_KRX_INVESTOR_TREND_V2",
+            "trade_type": "KRX",
+        }
+    return None
+
+
 HISTORY_SOURCE_AUDIT={}
+CURRENT_REGULAR_MAP={}
 HISTORY_SOURCE_LOCK=threading.Lock()
 
 def fetch_one_history(item,asof):
     ticker=item['ticker'];iso=asof[:4]+'-'+asof[4:6]+'-'+asof[6:8]
     try:
-        # Preserve V1's existing whole native series. NAVER is a shadow
-        # comparison on two liquid stocks, not a replacement for V1 prices.
-        values=daum_daily_prior(ticker,asof,140)
+        # Preserve the existing V1 native prior series. Same-day values are
+        # admitted only when DAUM's native daily row agrees with explicit KRX
+        # close/volume from NAVER's separated KRX investor-trend object.
+        all_values=daum_daily_through_asof(ticker,asof,140)
+        values=[r for r in all_values if r["date"] < asof]
+        same_day=next((r for r in all_values if r["date"] == asof),None)
+        krx=None;krx_error=None
+        try:
+            krx=naver_krx_regular_current(ticker,asof)
+        except (RuntimeError,ValueError,OSError) as exc:
+            krx_error=str(exc)[:400]
+        regular=None
+        if same_day and krx:
+            close_ok=(same_day.get("close") is not None and krx.get("close") is not None
+                      and same_day["close"] == krx["close"])
+            volume_ok=(same_day.get("volume") is not None and krx.get("volume") is not None
+                       and same_day["volume"] == krx["volume"])
+            if close_ok and volume_ok:
+                regular={**same_day,
+                         "foreign_net_buy":krx.get("foreign_net_buy"),
+                         "institution_net_buy":krx.get("institution_net_buy"),
+                         "foreign_hold_ratio":krx.get("foreign_hold_ratio"),
+                         "regular_session_verified":True,
+                         "source":"DAUM_DAILY_X_NAVER_KRX"}
         prices=[];comparison_error=None
         if ticker in {'005930','000660'}:
             try:
@@ -391,9 +475,14 @@ def fetch_one_history(item,asof):
                     get_text=lambda url,accept='application/xml, text/plain, */*':http_text(url,{**NAVER_HEADERS,'Accept':accept}),asof=iso)
             except (RuntimeError,ValueError,OSError) as exc:comparison_error=str(exc)[:400]
         bars,audit=shared.v1_profile_history(prices,values,iso)
-        audit.update({'price_route':'DAUM_DAILY_V1_EXISTING','comparison_source_error':comparison_error})
+        audit.update({'price_route':'DAUM_DAILY_V1_EXISTING','comparison_source_error':comparison_error,
+                      'same_day_krx_crosscheck':'PASS' if regular else 'DATA_NOT_AVAILABLE',
+                      'krx_current_error':krx_error})
         if not bars:raise RuntimeError('V1_NATIVE_HISTORY_DATA_NOT_AVAILABLE')
-        with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]=audit
+        with HISTORY_SOURCE_LOCK:
+            HISTORY_SOURCE_AUDIT[ticker]=audit
+            if regular:
+                CURRENT_REGULAR_MAP[ticker]=regular
         return ticker,bars,None
     except (RuntimeError,ValueError,OSError) as exc:
         with HISTORY_SOURCE_LOCK:HISTORY_SOURCE_AUDIT[ticker]={'status':'DATA_NOT_AVAILABLE','error':str(exc)[:500]}
