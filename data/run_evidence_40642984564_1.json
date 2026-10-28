@@ -1,0 +1,62 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "40642984564",
+  "run_attempt": 1,
+  "code_sha": "db8721d03371c561070606aedcfbcb88ea1fab45",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "benchmark_snapshot_20261028.csv",
+      "size_bytes": 344,
+      "sha256": "e2c6773cff0f3f57f050f94dde434b257a8aea0c858926abe5fb70bc9f7543e3"
+    },
+    {
+      "path": "etf_regime_summary_20261028.json",
+      "size_bytes": 173,
+      "sha256": "2249c5c77b7a11a67c279279071b12beae9a9eae9c950a23528c49f763d10456"
+    },
+    {
+      "path": "etf_snapshot_20261028.csv",
+      "size_bytes": 150874,
+      "sha256": "81e4363257b65f274391137479eeea27cc50dd4b04d0e45a0ab62715a3d6d0c7"
+    },
+    {
+      "path": "feature_coverage_20261028.json",
+      "size_bytes": 455,
+      "sha256": "9d2644e286a3bd84d550acd23ce769e46bafde1f4d69130bb42f0b5c5c072911"
+    },
+    {
+      "path": "history_source_audit_20261028.json",
+      "size_bytes": 1564495,
+      "sha256": "bd66a9b14dfa35e029c8c3e1ee18672856609d264e56bf379008b44c5f91c919"
+    },
+    {
+      "path": "latest_status.json",
+      "size_bytes": 1813,
+      "sha256": "10d78154b90d57f4879841be41060bdd3f76b2f56716e138b9c68dafa701e4c2"
+    },
+    {
+      "path": "manifest_20261028.json",
+      "size_bytes": 1411,
+      "sha256": "5b8d9d6e6b6c868f38183fed343c859b24887b830c08a54105716aaa8b92f24e"
+    },
+    {
+      "path": "pipeline_audit_20261028.json",
+      "size_bytes": 1712,
+      "sha256": "4d7eeb9708e59786f0d9efb8e75eb4d2fb5bb7689ac5968c6419f8e17c0f7027"
+    },
+    {
+      "path": "regular_close_capture_20261028.csv",
+      "size_bytes": 515224,
+      "sha256": "d369270e9cf8394a577c27b7cb6bf06a1f3114d57cc3d48d2a51c136541338a7"
+    },
+    {
+      "path": "universe_snapshot_20261028.csv",
+      "size_bytes": 1710547,
+      "sha256": "b64111ed1e32fd839744b713e030eda23ffb312dcc4feae531d22e591ce3514e"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
