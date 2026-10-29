@@ -1,0 +1,62 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "40876172507",
+  "run_attempt": 1,
+  "code_sha": "14a37172f4c450aebd89177d048a26b8ce807e56",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "benchmark_snapshot_20261029.csv",
+      "size_bytes": 348,
+      "sha256": "70319822d7aeb19a2fceec565e1d9f70f28a0674f58a382cf8f6a68e81c49d2c"
+    },
+    {
+      "path": "etf_regime_summary_20261029.json",
+      "size_bytes": 172,
+      "sha256": "2eb7e2ec94bef511eb31e710691e58bcb8b31535418161e309902d2311715711"
+    },
+    {
+      "path": "etf_snapshot_20261029.csv",
+      "size_bytes": 150375,
+      "sha256": "b6b5b359a54a200ebb4c61107353d99138b681fffd13ba1c7b23867c0147a1d5"
+    },
+    {
+      "path": "feature_coverage_20261029.json",
+      "size_bytes": 450,
+      "sha256": "4a32d63cbc7d495a2a0c9c4341237ae31a2059c4d858429ee7d552e6b1858f47"
+    },
+    {
+      "path": "history_source_audit_20261029.json",
+      "size_bytes": 2360994,
+      "sha256": "cd575e00076f9e6e48c5fd59f5eae31f926c5624aeae5507011726119338ee47"
+    },
+    {
+      "path": "latest_status.json",
+      "size_bytes": 1917,
+      "sha256": "4bd91eb8803890b7ee201022bb6bd9a336ad547da0246f98d315306b68148709"
+    },
+    {
+      "path": "manifest_20261029.json",
+      "size_bytes": 1406,
+      "sha256": "98b6f1b7f3ca3eee0eba37e0ed7bc19ed4d59df70f72388d53672bf8560e231c"
+    },
+    {
+      "path": "pipeline_audit_20261029.json",
+      "size_bytes": 1816,
+      "sha256": "bf669aa5f38474a97bc7092dccab7943d784c7fa5ec5abdccaacbee14a63460c"
+    },
+    {
+      "path": "regular_close_capture_20261029.csv",
+      "size_bytes": 143183,
+      "sha256": "d4b74ed4fa7f4692f89abfc9dc61900b7ad8087143fb50504d25394f5b8c201f"
+    },
+    {
+      "path": "universe_snapshot_20261029.csv",
+      "size_bytes": 2481058,
+      "sha256": "cc52e86b6761b94144f170d64cccb9ff2626d1accb37fc2ecf5f2df6598d562e"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
