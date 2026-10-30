@@ -1,0 +1,18 @@
+{
+  "asof_date": "20261030",
+  "collector_revision": "FREEWEB-1.2.8-KRX21",
+  "coverage": {
+    "price_momentum": 0.0,
+    "volume_liquidity": 0.0,
+    "volatility_trend": 0.0,
+    "sector": 0.0,
+    "flow": 0.0,
+    "fundamental_quality": 0.0,
+    "earnings_growth": 0.0,
+    "short_credit": 0.0
+  },
+  "active_feature_groups_at_70pct": [],
+  "active_stock_specific_non_price_groups": [],
+  "non_price_group_ok": false,
+  "coverage_threshold": 0.7
+}
