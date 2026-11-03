@@ -1,0 +1,62 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "41639771323",
+  "run_attempt": 1,
+  "code_sha": "83a15c8bf0e5c4df2e986d5c51fe043c6ef89272",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "benchmark_snapshot_20261103.csv",
+      "size_bytes": 349,
+      "sha256": "e6f726e39a27a533611b12fe0c51c39e17ddb470a2979ff0adf0d10cf16be75c"
+    },
+    {
+      "path": "etf_regime_summary_20261103.json",
+      "size_bytes": 172,
+      "sha256": "97e0a1a90ce5cd2ae5b36d2ab9ee17da84441c94ec8f9ac9ca914afefa98f38d"
+    },
+    {
+      "path": "etf_snapshot_20261103.csv",
+      "size_bytes": 151119,
+      "sha256": "349437cac9a8bb977ecb6cdc30ae6d7636a68bddbeec3123851ac8f2d165f5f9"
+    },
+    {
+      "path": "feature_coverage_20261103.json",
+      "size_bytes": 450,
+      "sha256": "c5d109f8ac64009a9c2c84ba873773e9d34dbb1e9be1ad6822ddba7640b3f770"
+    },
+    {
+      "path": "history_source_audit_20261103.json",
+      "size_bytes": 2363015,
+      "sha256": "79b24609d5e851ef0f05a96e40566787b49cae6a4e290751c1fd79f916889eeb"
+    },
+    {
+      "path": "latest_status.json",
+      "size_bytes": 1916,
+      "sha256": "0ba52db09b3f85076ec004836f7390603b1c74688675511865b0fa60eaf74e1d"
+    },
+    {
+      "path": "manifest_20261103.json",
+      "size_bytes": 1406,
+      "sha256": "7629b902d5ef8621cf51ad5f1d2331da79c57caa1c083c916c07835256c10748"
+    },
+    {
+      "path": "pipeline_audit_20261103.json",
+      "size_bytes": 1815,
+      "sha256": "083981a1b52381a0d660a0c2af57e6c6d39be5f51b81a00582e13fac60bd1a85"
+    },
+    {
+      "path": "regular_close_capture_20261103.csv",
+      "size_bytes": 143185,
+      "sha256": "41e9a168a4ec18ee10af9b0507ffba0c2df4ea707d0d6fd066a37287dfabffe5"
+    },
+    {
+      "path": "universe_snapshot_20261103.csv",
+      "size_bytes": 2485699,
+      "sha256": "83588676905419dc69f84a2daddee25e7f6ded9b123a996fa96a5f868df7f0fa"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
