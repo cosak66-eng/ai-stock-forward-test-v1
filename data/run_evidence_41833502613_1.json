@@ -1,0 +1,57 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "41833502613",
+  "run_attempt": 1,
+  "code_sha": "4c74725cd42e3678676b0b4c579dbd378c1b4bdb",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "benchmark_snapshot_20261104.csv",
+      "size_bytes": 345,
+      "sha256": "eaf6676494b5b69e95252da4d605e5f98a055c80e14f660dc41cedb248eddebf"
+    },
+    {
+      "path": "etf_regime_summary_20261104.json",
+      "size_bytes": 172,
+      "sha256": "f010d20004159ef183a5f8a7b3067ecdcd5260f0780dbd45b047d7554f143095"
+    },
+    {
+      "path": "etf_snapshot_20261104.csv",
+      "size_bytes": 150461,
+      "sha256": "131e33b4b82dc871a502d51010c4f3bee5de9faed364a74bf074fa51909a6e2b"
+    },
+    {
+      "path": "feature_coverage_20261104.json",
+      "size_bytes": 450,
+      "sha256": "2c1dd5746d79fd5609b5d64b6d7264cfc70b2436d2aa77282a7c946ce5cd7de4"
+    },
+    {
+      "path": "history_source_audit_20261104.json",
+      "size_bytes": 2376080,
+      "sha256": "c82e47fc2a841131aa07398cb08d3153e64b38cff522a9545d3325b904f2cf57"
+    },
+    {
+      "path": "latest_status.json",
+      "size_bytes": 1906,
+      "sha256": "d6708419264d5d4333aed443b0b8e87dce51cfb87286ccac778ff70582398875"
+    },
+    {
+      "path": "manifest_20261104.json",
+      "size_bytes": 1249,
+      "sha256": "4d6303de1ce88635db439c12bab07ed5218c350fd069dc52a0cb9d61c4a01840"
+    },
+    {
+      "path": "pipeline_audit_20261104.json",
+      "size_bytes": 1805,
+      "sha256": "33704ba81c797b5021e8b8caf1031967a7c95ddf23dbe5c696b9fe9c120e9850"
+    },
+    {
+      "path": "universe_snapshot_20261104.csv",
+      "size_bytes": 2638669,
+      "sha256": "96386d629ff43e4b65e79a2023f49fc9630eea332fa144db38b98929da3d13bc"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
