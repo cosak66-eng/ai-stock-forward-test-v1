@@ -1,0 +1,40 @@
+{
+  "asof_date": "20261106",
+  "collector_revision": "FREEWEB-1.2.8-KRX21",
+  "schema_version": "V10-DATA-1.2",
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "files": {
+    "regular_close_capture_20261106.csv": {
+      "sha256": "d9037437d7122d7b6a3eef5e8be4d4f5ee29ad52dd16f230e3f5047c0945f964",
+      "bytes": 135203
+    },
+    "universe_snapshot_20261106.csv": {
+      "sha256": "b72ee91bd13b5b8c3ba0ecbed25d92e89fd05bbcb18d747588e4320d1030ce04",
+      "bytes": 2494966
+    },
+    "etf_snapshot_20261106.csv": {
+      "sha256": "bbcf0fc7fbb794ba759527090cdf937d2784a909644d410e3b3e5f48c4c84768",
+      "bytes": 151384
+    },
+    "benchmark_snapshot_20261106.csv": {
+      "sha256": "251ce3d12dba47ee79f53c1ee65efe695d9c9d67af64bd3073e0f11d8395bcbc",
+      "bytes": 346
+    },
+    "feature_coverage_20261106.json": {
+      "sha256": "ad2d4b0be138ff79c845975308d8c7a7eefd51a05828c70dd204eca47a3bbc63",
+      "bytes": 450
+    },
+    "etf_regime_summary_20261106.json": {
+      "sha256": "cb536e01428002e9cd7ddbf14277bb1aee6a5da7f479ef9b98dd52a3a923b446",
+      "bytes": 173
+    },
+    "pipeline_audit_20261106.json": {
+      "sha256": "f6db6d38ff926ab97bd6d944733c10017be330d3514b2d077feb26513dd1cb94",
+      "bytes": 1816
+    },
+    "history_source_audit_20261106.json": {
+      "sha256": "91e4ddda8ea45fa57998dabe927b5eb80db606c31f91dc6f43c6336ce39feb2e",
+      "bytes": 2364468
+    }
+  }
+}
