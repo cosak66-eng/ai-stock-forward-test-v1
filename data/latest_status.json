@@ -4,10 +4,10 @@
   "collector_revision": "FREEWEB-1.2.8-KRX21",
   "schema_version": "V10-DATA-1.2",
   "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
-  "asof_date": "20261111",
+  "asof_date": "20261112",
   "error": "EARLY_RUN_TOO_EARLY",
-  "collected_at_kst": "2026-11-11T04:35:42.688533+09:00",
-  "runner_started_kst": "2026-11-11T04:35:42.688513+09:00",
-  "planned_wait_seconds": 59057.311,
+  "collected_at_kst": "2026-11-12T04:28:36.101489+09:00",
+  "runner_started_kst": "2026-11-12T04:28:36.101472+09:00",
+  "planned_wait_seconds": 59483.899,
   "required_window_kst": "21:00:00–22:00:00"
 }
