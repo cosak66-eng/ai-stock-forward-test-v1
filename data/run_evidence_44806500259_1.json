@@ -1,0 +1,22 @@
+{
+  "shared_collector_version": "COMMON-MARKET-DATA-0.1.1",
+  "shared_module_sha256": "a53ca3d1fa60f47ed5a45bfc30e6a0734354bc7a6fb86ca6b703213853bed0d8",
+  "run_id": "44806500259",
+  "run_attempt": 1,
+  "code_sha": "04c623d09dcfa9bbb29c657aafb398a62a346669",
+  "status": "SOURCE_OUTPUT_PRESERVED",
+  "files": [
+    {
+      "path": "latest_status.json",
+      "size_bytes": 462,
+      "sha256": "ca9fa87b01c3e06321b0a40241faaa0ed5fd628a9d9e803e7f1a4af736213169"
+    },
+    {
+      "path": "pipeline_audit_20261121.json",
+      "size_bytes": 462,
+      "sha256": "ca9fa87b01c3e06321b0a40241faaa0ed5fd628a9d9e803e7f1a4af736213169"
+    }
+  ],
+  "official_prediction": false,
+  "orders_sent": 0
+}
