@@ -3,6 +3,8 @@ on:
   push:
     branches: [main, codex/shared-collector-20261020]
     paths:
+      - 'source_http_evidence.py'
+      - 'test_source_http_evidence.py'
       - 'shared_market_data.py'
       - 'shared_market_data_manifest.json'
       - 'shared_collector_diagnostic.py'
@@ -21,6 +23,8 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'source_http_evidence.py'
+      - 'test_source_http_evidence.py'
       - 'shared_market_data.py'
       - 'collector.py'
       - 'market_crosscheck.py'

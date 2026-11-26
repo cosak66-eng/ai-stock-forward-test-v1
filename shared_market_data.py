@@ -6,11 +6,12 @@ No orders, imputation, close*volume monetary estimates or source certification.
 from __future__ import annotations
 import ast,csv,io,json,math,random,re,time
 import urllib.request,urllib.error,urllib.parse
+from source_http_evidence import preserve_failure
 import xml.etree.ElementTree as ET
 from datetime import datetime,timedelta,date
 from typing import Any,Iterable
 from zoneinfo import ZoneInfo
-VERSION='COMMON-MARKET-DATA-0.1.1'
+VERSION='COMMON-MARKET-DATA-0.1.2'
 TZ=ZoneInfo('Asia/Seoul')
 DEFAULT_HEADERS={'User-Agent':'Mozilla/5.0','Referer':'https://stock.naver.com/','Accept':'application/json, text/plain, */*'}
 PERMANENT_HTTP={400,401,403,404,410,422}
@@ -27,10 +28,12 @@ def request_bytes(url,headers=None,timeout=30,tries=4):
                 if len(raw)>16*1024*1024:raise RuntimeError('Source response exceeds 16 MiB')
                 return raw,response.headers.get_content_charset() or ''
         except urllib.error.HTTPError as exc:
+            preserve_failure(url,exc,attempt+1)
             last=exc
             if exc.code in PERMANENT_HTTP:break
             retry=exc.headers.get('Retry-After','') if exc.headers else ''
         except (urllib.error.URLError,TimeoutError,OSError) as exc:
+            preserve_failure(url,exc,attempt+1)
             last=exc;retry=''
         if attempt+1<tries:
             delay=min(20.0,1.5*2**attempt)

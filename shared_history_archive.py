@@ -9,6 +9,7 @@ import argparse, concurrent.futures, datetime as dt, gzip, hashlib, json, math
 import os, re, time, urllib.parse, urllib.request, xml.etree.ElementTree as ET
 from pathlib import Path
 from zoneinfo import ZoneInfo
+from source_http_evidence import preserve_failure
 
 VERSION='COMMON-HISTORY-ARCHIVE-0.1.0'
 TZ=ZoneInfo('Asia/Seoul')
@@ -42,6 +43,7 @@ def get_bytes(url):
     if len(b)>MAX_RESPONSE:raise ValueError('Source response exceeded bound')
     return b
   except Exception as e:
+   preserve_failure(url,e,n+1)
    last=e
    if getattr(e,'code',None) in (400,401,403,404):break
    if n==0:time.sleep(2)
@@ -155,29 +157,51 @@ def collect_ticker(ticker,start,end,root,*,get=get_bytes,max_pages=32):
  result['status']='AVAILABLE_HISTORY_ARCHIVED' if not result['errors'] else 'PARTIAL_OR_MISSING'
  write_json(root/'audit.json',result);return result
 
-def collect(start,end,out_dir,tickers=None,*,workers=2,shard_index=0,shard_count=1):
+def require_evening_window(now,expected_day):
+ if now.tzinfo is None:raise ValueError('Collection timestamp must include timezone')
+ local=now.astimezone(TZ)
+ if local.date().isoformat()!=expected_day or not dt.time(21)<=local.time().replace(tzinfo=None)<=dt.time(22):
+  raise RuntimeError('OUTSIDE_COLLECTION_WINDOW: regular collection requires same-day 21:00-22:00 KST')
+
+def collect(start,end,out_dir,tickers=None,*,workers=2,shard_index=0,shard_count=1,enforce_window=False):
  if not '2023-01-01'<=start<=end<=dt.datetime.now(TZ).date().isoformat():raise ValueError('Invalid prospective archive date range')
  if not 1<=workers<=4 or not 0<=shard_index<shard_count<=8:raise ValueError('Unbounded worker/shard settings')
  root=Path(out_dir)
  if (root/'archive_manifest.json').exists():raise ValueError('Refuse to overwrite sealed archive')
  root.mkdir(parents=True,exist_ok=True)
+ started=dt.datetime.now(TZ)
+ if enforce_window:
+  try:
+   if start!=end:raise RuntimeError('Regular evening collection requires one same-day date')
+   require_evening_window(started,end)
+  except (ValueError,RuntimeError) as error:
+   write_json(root/'collection_window_guard.json',{'status':'BLOCKED','observed_at_kst':started.isoformat(),'target_date':end,'error':str(error),'source_requests_sent':0,'official_prediction':False,'orders_sent':0})
+   raise
+ def source_bytes(url):
+  if enforce_window:require_evening_window(dt.datetime.now(TZ),end)
+  return get_bytes(url)
  if tickers is None:
   from shared_market_data import fetch_naver_universe
-  universe=fetch_naver_universe();tickers=[r['ticker'] for r in universe]
+  universe=fetch_naver_universe(get_json=lambda url:json.loads(source_bytes(url)));tickers=[r['ticker'] for r in universe]
   write_json(root/'current_universe.json',universe)
  tickers=sorted(set(code(t) for t in tickers));selected=[t for i,t in enumerate(tickers) if i%shard_count==shard_index]
  write_json(root/'request.json',{'start_date':start,'end_date':end,'selected_tickers':selected,'universe_size':len(tickers),
   'universe_basis':'CURRENT_LISTED_ONLY_NOT_POINT_IN_TIME','delisted_universe_verified':False,'shard_index':shard_index,'shard_count':shard_count})
  results=[]
  with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
-  futures={ex.submit(collect_ticker,t,start,end,root/'tickers'):t for t in selected}
+  futures={ex.submit(collect_ticker,t,start,end,root/'tickers',get=source_bytes):t for t in selected}
   for future in concurrent.futures.as_completed(futures):
    try:result=future.result()
    except Exception as e:result={'ticker':futures[future],'status':'PARTIAL_OR_MISSING','errors':{'worker':str(e)}}
    results.append(result)
    with (root/'progress.jsonl').open('a') as f:f.write(json.dumps(result,ensure_ascii=False)+'\n')
    if len(results)%25==0:print(f'ARCHIVE_PROGRESS {len(results)}/{len(selected)}',flush=True)
+ finished=dt.datetime.now(TZ);window_pass=False
+ if enforce_window:
+  try:require_evening_window(finished,end);window_pass=True
+  except (ValueError,RuntimeError):pass
  summary={'version':VERSION,'research_only':True,'official_prediction':False,'orders_sent':0,'start_date':start,'end_date':end,
+  'collection_started_at_kst':started.isoformat(),'collection_finished_at_kst':finished.isoformat(),'enforce_window':enforce_window,'collection_window_pass':window_pass,
   'run_id':os.getenv('GITHUB_RUN_ID'),'attempt':os.getenv('GITHUB_RUN_ATTEMPT'),'code_sha':os.getenv('GITHUB_SHA'),
   'selected':len(selected),'completed':len(results),'available_history':sum(r['status']=='AVAILABLE_HISTORY_ARCHIVED' for r in results),
   'partial_or_missing':sum(r['status']!='AVAILABLE_HISTORY_ARCHIVED' for r in results),'price_rows':sum(r.get('prices_rows',0) for r in results),
@@ -189,8 +213,8 @@ def collect(start,end,out_dir,tickers=None,*,workers=2,shard_index=0,shard_count
  write_json(root/'archive_manifest.json',{'files':files});print(json.dumps(summary,ensure_ascii=False),flush=True);return summary
 
 def main():
- p=argparse.ArgumentParser(description=__doc__);p.add_argument('--start-date',default='2023-01-01');p.add_argument('--end-date',default=dt.datetime.now(TZ).date().isoformat());p.add_argument('--out-dir',required=True);p.add_argument('--tickers',nargs='+');p.add_argument('--full-universe',action='store_true');p.add_argument('--confirm-full-market',action='store_true');p.add_argument('--workers',type=int,default=2);p.add_argument('--shard-index',type=int,default=0);p.add_argument('--shard-count',type=int,default=1);a=p.parse_args()
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--start-date',default='2023-01-01');p.add_argument('--end-date',default=dt.datetime.now(TZ).date().isoformat());p.add_argument('--out-dir',required=True);p.add_argument('--tickers',nargs='+');p.add_argument('--full-universe',action='store_true');p.add_argument('--confirm-full-market',action='store_true');p.add_argument('--workers',type=int,default=2);p.add_argument('--shard-index',type=int,default=0);p.add_argument('--shard-count',type=int,default=1);p.add_argument('--enforce-window',action='store_true');a=p.parse_args()
  if a.full_universe != a.confirm_full_market or (not a.tickers and not a.full_universe) or (a.tickers and a.full_universe):p.error('Choose bounded tickers or explicitly confirm full universe')
- s=collect(a.start_date,a.end_date,a.out_dir,a.tickers,workers=a.workers,shard_index=a.shard_index,shard_count=a.shard_count)
- return 0 if s['selected']>0 and s['available_history']>0 else 2
+ s=collect(a.start_date,a.end_date,a.out_dir,a.tickers,workers=a.workers,shard_index=a.shard_index,shard_count=a.shard_count,enforce_window=a.enforce_window)
+ return 0 if s['selected']>0 and s['available_history']>0 and (not a.enforce_window or s['collection_window_pass']) else 2
 if __name__=='__main__':raise SystemExit(main())
