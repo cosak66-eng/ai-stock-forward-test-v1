@@ -8,6 +8,28 @@ def flow(day,**kw):
  r={'localTradedAt':day,'krx':{'closingPrice':'21','tradingVolume':'200','foreignNetVolume':'-10','organizationNetVolume':'0'},'nxt':{'foreignNetVolume':'999'}};r['krx'].update(kw);return r
 
 class HistoryArchiveTests(unittest.TestCase):
+ def test_scheduled_collection_outside_window_makes_zero_source_requests(self):
+  for hour in (4,20,23):
+   now=dt.datetime(2026,11,19,hour,30,tzinfo=h.TZ)
+   with tempfile.TemporaryDirectory() as tmp,patch.object(h.dt,'datetime',wraps=dt.datetime) as clock,patch.object(h,'get_bytes') as fetch:
+    clock.now.return_value=now
+    with self.assertRaisesRegex(RuntimeError,'OUTSIDE_COLLECTION_WINDOW'):
+     h.collect('2026-11-19','2026-11-19',tmp,enforce_window=True)
+    fetch.assert_not_called()
+    guard=json.loads((Path(tmp)/'collection_window_guard.json').read_text())
+    self.assertEqual(guard['source_requests_sent'],0);self.assertEqual(guard['status'],'BLOCKED')
+ def test_window_is_timezone_aware_same_day_and_has_exact_bounds(self):
+  for stamp in ('2026-11-19T21:00:00+09:00','2026-11-19T22:00:00+09:00','2026-11-19T12:30:00+00:00'):
+   h.require_evening_window(dt.datetime.fromisoformat(stamp),'2026-11-19')
+  for stamp in ('2026-11-19T20:59:59+09:00','2026-11-19T22:00:01+09:00','2026-11-20T21:30:00+09:00','2026-11-19T21:30:00'):
+   with self.assertRaises((RuntimeError,ValueError)):h.require_evening_window(dt.datetime.fromisoformat(stamp),'2026-11-19')
+ def test_crossing_deadline_prevents_next_request_and_cannot_report_collection_success(self):
+  now=dt.datetime(2026,11,19,21,59,tzinfo=h.TZ);late=now+dt.timedelta(minutes=2)
+  with tempfile.TemporaryDirectory() as tmp,patch.object(h.dt,'datetime',wraps=dt.datetime) as clock,patch.object(h,'get_bytes') as fetch:
+   clock.now.side_effect=[now,now,late,late,late,late]
+   summary=h.collect('2026-11-19','2026-11-19',tmp,['005930'],enforce_window=True)
+   fetch.assert_not_called();self.assertFalse(summary['collection_window_pass'])
+   self.assertEqual(summary['available_history'],0)
  def test_prices_date_range_and_no_money_estimation(self):
   rows,dates=h.parse_prices(PRICE,'2023-01-01','2026-10-28');self.assertEqual(len(rows),2);self.assertIsNone(rows[0]['trading_value']);self.assertEqual(rows[0]['date'],'2023-01-02')
  def test_xml_korean_encoding(self):

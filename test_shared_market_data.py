@@ -11,6 +11,7 @@ class SharedTests(unittest.TestCase):
  def test_vendor_pin(self):
   root=Path(m.__file__).parent;expected=json.loads((root/'shared_market_data_manifest.json').read_text())
   self.assertEqual(hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest(),expected['sha256'])
+  self.assertEqual(hashlib.sha256((root/'source_http_evidence.py').read_bytes()).hexdigest(),expected['source_http_evidence_sha256'])
  def test_permanent_404_switches_immediately(self):
   with patch.object(m.urllib.request,'urlopen',side_effect=urllib.error.HTTPError('https://example.com',404,'missing',{},None)) as http,patch.object(m.time,'sleep') as wait:
    with self.assertRaises(RuntimeError):m.request_bytes('https://example.com')

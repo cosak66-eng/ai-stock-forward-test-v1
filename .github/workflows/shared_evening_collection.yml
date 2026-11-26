@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
-    paths: ['shared_history_archive.py', 'test_shared_history_archive.py', '.github/workflows/shared_evening_collection.yml']
+    paths: ['shared_history_archive.py', 'test_shared_history_archive.py', 'source_http_evidence.py', 'test_source_http_evidence.py', '.github/workflows/shared_evening_collection.yml']
 permissions:
   contents: read
 concurrency:
@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Archive regression and frozen V1 boundaries
-        run: python -m unittest -v test_shared_history_archive.py test_v1_shared_integration.py
+        run: python -m unittest -v test_shared_history_archive.py test_v1_shared_integration.py test_source_http_evidence.py
   collect:
     needs: validate
     if: github.event_name != 'pull_request'
@@ -34,10 +34,13 @@ jobs:
         with:
           python-version: '3.12'
       - name: Evening research source archive only
+        env:
+          SOURCE_HTTP_EVIDENCE_DIR: evening_research_archive/http_failures
         run: |
+          export SOURCE_CODE_SHA="$(git rev-parse HEAD)"
           DAY="$(TZ=Asia/Seoul date +%F)"
           python shared_history_archive.py --start-date "$DAY" --end-date "$DAY" \
-            --full-universe --confirm-full-market --workers 4 --out-dir evening_research_archive
+            --full-universe --confirm-full-market --workers 4 --out-dir evening_research_archive --enforce-window
       - uses: actions/upload-artifact@v4
         if: always()
         with:

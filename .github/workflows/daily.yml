@@ -47,7 +47,10 @@ jobs:
       - name: Run controlled collector
         id: collector
         shell: bash
+        env:
+          SOURCE_HTTP_EVIDENCE_DIR: output/http_failures
         run: |
+          export SOURCE_CODE_SHA="$(git rev-parse HEAD)"
           if [ "${{ github.event_name }}" = "schedule" ]; then
             python collector.py --mode scheduled
           else
